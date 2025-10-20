@@ -66,7 +66,7 @@ This included task distribution, creating a shared Git repository, and preparing
     The Requirements Specification draft is managed collaboratively in the project repository under `docs/Requirements_Specifications.md`.
 
 
-* VM / Security Environment Setup
+* **VM / Security Environment Setup**
 
     * **Responsible:** *Linus Rode*
 
