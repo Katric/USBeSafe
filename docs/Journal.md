@@ -52,62 +52,62 @@ The goal was to clearly describe the use case, define the technical requirements
 This included task distribution, creating a shared Git repository, and preparing a clean documentation structure for future development.
 
 
-#### **Requirements Specification (Pflichtenheft)**
+* **Requirements Specification (Pflichtenheft)**
 
-**Responsible:** *All members*
+    * **Responsible:** *All members*
 
-The group collaborated on defining the functional and non-functional requirements of the SecurePass system.
-This includes:
+    The group collaborated on defining the functional and non-functional requirements of the SecurePass system.
+    This includes:
 
-- Describing the system’s purpose (USB data transfer via virtualized sandbox environment)
-- Defining the workflow (automatic scan, VM isolation, safe re-import)
-- Establishing minimum deliverables (working CLI, scan report, mounting process)
+    - Describing the system’s purpose (USB data transfer via virtualized sandbox environment)
+    - Defining the workflow (automatic scan, VM isolation, safe re-import)
+    - Establishing minimum deliverables (working CLI, scan report, mounting process)
 
-The Requirements Specification draft is managed collaboratively in the project repository under `docs/Requirements_Specifications.md`.
-
-
-#### **VM / Security Environment Setup**
-
-**Responsible:** *Linus Rode*
-
-Initial research and configuration of a suitable virtual environment began.
-The focus was on exploring **Kali Linux** and **QEMU/KVM** setups to provide isolation for scanning operations.
-A first test VM was created to confirm compatibility with USB passthrough and automation.
+    The Requirements Specification draft is managed collaboratively in the project repository under `docs/Requirements_Specifications.md`.
 
 
-#### **Virtual USB & CLI Planning**
+* VM / Security Environment Setup
 
-**Responsible:** *Paul Ilitz*
+    * **Responsible:** *Linus Rode*
 
-The first concepts for the **virtual USB stick** and **CLI workflow** were developed.
-Paul explored how to create and mount virtual drives dynamically and defined the interface between CLI commands and the VM startup process.
-
-
-#### **Virus Scan Architecture**
-
-**Responsible:** *Constantin Scheryer*
-
-Research began into possible scanning tools and frameworks.
-The focus was on lightweight and scriptable options such as **ClamAV**, along with ideas for an **“ampel” (traffic-light)** scoring system to visually indicate scan results.
+    Initial research and configuration of a suitable virtual environment began.
+    The focus was on exploring **Kali Linux** and **QEMU/KVM** setups to provide isolation for scanning operations.
+    A first test VM was created to confirm compatibility with USB passthrough and automation.
 
 
-#### **USB Pass-Through (Host → VM)**
+* **Virtual USB & CLI Planning**
 
-**Responsible:** *Tizian Everke & Richard Kats*
+    * **Responsible:** *Paul Ilitz*
 
-Investigation started into identifying USB devices on the host before enumeration to prevent malicious device behavior.
-First notes were collected on how **VirtualBox USB filters** or **udev rules** might be used to safely forward the device into the VM.
+    The first concepts for the **virtual USB stick** and **CLI workflow** were developed.
+    Paul explored how to create and mount virtual drives dynamically and defined the interface between CLI commands and the VM startup process.
 
 
-#### **GUI Concept**
+* **Virus Scan Architecture**
 
-**Responsible:** *Aaron Debebe*
+    * **Responsible:** *Constantin Scheryer*
 
-A simple draft for the **graphical interface** was created, focusing on user feedback and automation flow:
+    Research began into possible scanning tools and frameworks.
+    The focus was on lightweight and scriptable options such as **ClamAV**, along with ideas for an **“ampel” (traffic-light)** scoring system to visually indicate scan results.
 
-- Automatic display of scanning progress
-- Traffic-light visualization for results
-- Safe mounting button after successful scan
+
+* **USB Pass-Through (Host → VM)**
+
+    * **Responsible:** *Tizian Everke & Richard Kats*
+
+    Investigation started into identifying USB devices on the host before enumeration to prevent malicious device behavior.
+    First notes were collected on how **VirtualBox USB filters** or **udev rules** might be used to safely forward the device into the VM.
+
+
+* **GUI Concept**
+
+    * **Responsible:** *Aaron Debebe*
+
+    A simple draft for the **graphical interface** was created, focusing on user feedback and automation flow:
+
+    - Automatic display of scanning progress
+    - Traffic-light visualization for results
+    - Safe mounting button after successful scan
 
 ---
 
