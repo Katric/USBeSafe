@@ -1,0 +1,97 @@
+# --- OS cruft ---
+.DS_Store
+Thumbs.db
+
+# --- Git merge/patch leftovers ---
+*.orig
+*.rej
+
+# --- Logs & temp ---
+logs/
+*.log
+tmp/
+temp/
+.cache/
+*.pid
+
+# --- Editor / IDE ---
+.vscode/
+.idea/
+*.iml
+
+# --- Secrets (never commit) ---
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.keystore
+*.crt
+*.pfx
+id_rsa
+id_rsa.pub
+
+# === Language/Tool specific (pick what you need) ===
+
+# --- Node / Frontend ---
+node_modules/
+dist/
+build/
+.npm/
+.yarn/*
+!.yarn/patches/
+!.yarn/plugins/
+!.yarn/releases/
+!.yarn/sdks/
+!.yarn/versions/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp.*
+.next/
+out/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# --- LaTeX / Overleaf ---
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+
+# --- Java ---
+target/
+*.class
+*.jar
+*.war
+
+# --- Rust ---
+**/target/
+
+# --- Go ---
+bin/
+*.test
+
+# --- C/C++ / CMake ---
+*.o
+*.a
+*.so
+*.dylib
+/build/
+CMakeFiles/
+CMakeCache.txt
