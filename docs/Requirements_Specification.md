@@ -43,6 +43,64 @@
 ### 1. VM / Security Environment: Linus Rode
 
 
+#### Purpose  
+The VM provides the isolated execution environment for all SecurePass operations.  
+It acts as the backbone of the system by securely running the scanning and file-handling processes without exposing the host to any risk.  
+
+#### Concept  
+A lightweight, disposable virtual machine or container will be used to handle all USB data.  
+It should support a simple GUI for file browsing and scanning, allow temporary package installation, and be fully resettable after each use.  
+The goal is to guarantee complete separation between host and guest.
+
+#### Technology Comparison  
+
+| Option | Pros | Cons | Notes |
+|--------|------|------|------|
+| **QEMU/KVM** | Strong isolation, mature, GUI support (SPICE/VNC), full system reset possible | Slightly heavier resource use | Most secure and flexible option |
+| **Kata Containers** | Fast startup, container tooling with VM isolation | GUI setup more complex, less common | Possible compromise between speed and security |
+| **Podman / Docker** | Very lightweight, easy automation | Shares host kernel → not secure against kernel-level exploits | Suitable only for prototypes |
+| **Firecracker / MicroVMs** | Extremely small attack surface | No GUI support, limited package options | Not practical for our use case |
+
+**Initial direction:** QEMU/KVM, as it offers full isolation and a working GUI environment.
+
+#### Operating System  
+A minimal Linux distribution (e.g., Debian, Ubuntu, or Alpine-based) with a lightweight desktop environment such as XFCE or LXQt.  
+The OS must be stateless, easily rebuilt, and capable of running common Linux tools.
+
+#### Security Requirements  
+- The guest must have **no network connection** to the host or internet.  
+- No shared folders or host mounts.  
+- Access only to controlled virtual devices (USB image or passthrough).  
+- VM reset after each use (delete overlay or rebuild image).  
+- Host and hypervisor run with limited privileges and updated packages.  
+
+#### Reset and Rebuild  
+After each scan session, the VM will be destroyed and re-created from a clean base image.  
+This guarantees no persistence of data or configuration between sessions.  
+Automated scripts will handle overlay deletion and reinitialization.
+
+#### Problems and Risks  
+- Balancing startup speed and isolation strength.  
+- GUI forwarding performance under strong sandboxing.  
+- Managing large USB images or complex partition layouts.  
+- Keeping rebuild times short while ensuring integrity.
+
+#### Sources  
+- [QEMU/KVM official documentation](https://www.qemu.org/docs/master/)
+- [Container Security: Issues, Challenges, and the Road Ahead](https://ieeexplore.ieee.org/abstract/document/8693491)
+- [Comparison between security majors in virtual machine and linux containers](https://arxiv.org/abs/1507.07816)
+
+#### Overlapping Points with Other Modules  
+- Must accept and expose virtual USB device for **Step 2 (Virtual USB stick)**  
+- Must be run by the CLI Tool in **Step 3 CLI (VM start, USB script)**  
+- Must allow package installation for **Step 4 (Virus scanner)**  
+- Must handle USB passthrough coordination with **Step 5 (Host → VM interface)**  
+- Must support GUI display for **Step 6 (GUI module)**  
+
+#### Output  
+A documented and reproducible virtual environment that can start, display a GUI, run scanning tasks, and be securely reset after each use.
+
+
 
 ### 2. Virtual USB Stick: Paul Ilitz
 
