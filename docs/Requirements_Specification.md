@@ -107,8 +107,20 @@ Two main technical solutions are being considered for implementing the virtual U
 
 
 
-### 4. Virus Scan & Traffic-Light System: Constantin Scheryer
+### 4. Virus Scan & Traffic-Light System: Constantin Schreyer
 
+#### General
+
+The function of virus scan is to provide a file scanner which focusses on being lightweight and configurable. Depending on the specific setting (file types, file sizes, file count etc.) it is able to inspect the files for different types of malware which could harm the host system. The virus scanner returns simple classes for easy understanding of the harm potential of each file.
+
+#### Virus Scanner
+
+We aim to present different virus scanner and their advantages and disadvantages. We explain the different types of malware detection (e.g. signature based, heuristic based, behavior based etc.) and which one is suited best for our application.
+We implement one such virus scanner for our application.
+
+#### Traffic Light System
+
+Goal of such a system is to ensure simplicity and comprehensibility for the end user. In the end, the virus scanner will categorise the different files into one of three classes/colors. Green: No danger is likely to be posed to the system. Yellow: It can not be ruled out that harm might be taken to the system. Red: Immediate danger is likely to be posed to the system. For more context, brief reasoning may be provided. 
 
 
 ### 5. USB Pass-Through Host → VM (Interface): Tizian Everke & Richard Kats
