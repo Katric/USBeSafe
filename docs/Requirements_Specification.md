@@ -105,6 +105,33 @@ Two main technical solutions are being considered for implementing the virtual U
 
 ### 3. CLI (VM Start, USB Script): Paul Ilitz
 
+The CLI tool serves as the central orchestrator for the SecurePass workflow, providing a command-line interface that coordinates all components of the system from initial startup through secure file transfer.
+
+#### Core Responsibilities
+
+- **VM lifecycle management**: Automatically start, configure, and shut down the virtual machine environment
+- **USB detection and handling**: Monitor for USB device insertion and coordinate the pass-through to the VM
+- **Component coordination**: Act as the communication hub between the GUI, virus scanner, virtual USB stick, and VM
+- **User interaction**: Provide clear command-line prompts and status updates throughout the scanning process
+- **Error handling**: Gracefully manage exceptions and ensure safe cleanup in case of failures
+
+#### Workflow Integration
+
+The CLI script will be implemented in a language suitable for system-level operations (likely Rust or Python) and will:
+1. Initialize the secure VM environment with appropriate security settings
+2. Wait for and detect USB device insertion events
+3. Trigger the USB pass-through mechanism to forward the device to the VM
+4. Launch the VM
+5. Coordinate with the virus scanner to initiate malware detection
+6. Manage the virtual USB stick creation, mounting, and destruction based on scan results
+7. Handle graceful shutdown and cleanup of all resources
+
+#### Technical Considerations
+
+- **Cross-platform compatibility**: Ensure the CLI works seamlessly on the target Linux distribution
+- **Privilege management**: Handle necessary elevated permissions for VM operations and USB access
+- **Logging**: Maintain detailed logs of all operations for troubleshooting and security auditing
+- **Configuration**: Support configuration files for customizing VM settings, timeout values, and security policies
 
 
 ### 4. Virus Scan & Traffic-Light System: Constantin Schreyer
