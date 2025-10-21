@@ -180,7 +180,16 @@ We aim to identify an inserted USB stick (is it a keyboard? a flash drive?) and 
   - How and where could this be detected?  
 
 #### Sources
-In shared Zotero group, to be added here later  
+Some useful documentation and links:
+- [What is meant by mounting a device in Linux?](https://unix.stackexchange.com/a/3194)
+- [Understanding Mount Points and How They Work](https://www.linuxbash.sh/post/understanding-mount-points-and-how-they-work)
+- [How to Mount File System in Linux | mount Command](https://www.geeksforgeeks.org/linux-unix/mount-command-in-linux-with-examples/)
+- [How to Check Whether a USB Device Is Present on a Linux Machine](https://www.baeldung.com/linux/check-for-usb-devices)
+- [How to Disable Auto-Mounting of Devices](https://www.baeldung.com/linux/ubuntu-disable-automated-mounting)
+- [[Video] How to Mount USB Drive in Terminal on Linux: A Step-by-Step Tutorial](https://www.youtube.com/watch?v=t1MCbL95Xcg)  
+_(This tutorial also shows how to trust a specific device)_
+
+--> More sources can be found in the shared Zotero group, to be added here later  
 
 
 
