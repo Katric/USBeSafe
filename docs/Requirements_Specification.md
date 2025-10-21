@@ -158,3 +158,35 @@ In shared Zotero group, to be added here later
 
 
 ### 6. GUI (Automated File Management): Aaron Debebe
+
+#### Purpose
+Providing an intuitive interface for the user to securely interact with an USB device.
+
+#### Features
+1. Automatic File View
+    - GUI (Qt or GTK) should open automatically, displaying the contents of the USB device
+2. Traffic Light Visualization
+    - Files are colored based on scan results:
+        - Green: Safe
+        - Yellow: Potentially suspicious
+        - Red: Malicious
+    - Maybe display animated spinner during scanning
+3. File Operations
+    - Copy files to host system after scanning (only Green, maybe Yellow?)
+    - Option to select multiple files for transfer
+    - Option to delete files?
+4. Timer & VM Reset
+    - A countdown timer is displayed. During the timer, the user can interact with the files.
+    - Once the timer expires -> VM reset
+    - Also allow option for the user to abort manually
+5. Communication with other components
+    - virus scanner, CLI tool, etc.
+    - via sockets?
+6. Logging
+    - Log users action (file selection, transfers, etc.)
+7. Export report
+    - Option to export a report
+    - Following should be interesting: metadata (name, size, type, etc.), sha256, (scanners used), scanning result, timestamps
+    - The report should be saved on the host system
+    - Maybe sign the report?
+    - JSON/YAML + PDF/HTML
