@@ -1,4 +1,4 @@
-# SecurePass (Maybe USBeSafe? ;))
+# USBeSafe
 
 ---
 
@@ -11,9 +11,9 @@
 ### Minimum requirements for the project:
 - A functioning CLI tool that scans USB sticks for malware, displays a report in _Nautilus_, and mounts the stick on the host system afterwards
 
-### SecurePass Workflow
+### USBeSafe Workflow
 
-1. Start the SecurePass app  
+1. Start the USBeSafe app  
 2. Insert the USB stick into the VM  
 3. The file view opens automatically  
 4. Automatic scan (traffic-light system to evaluate security)  
@@ -44,7 +44,7 @@
 # 1. VM / Security Environment: Linus Rode
 
 ## Purpose  
-The VM provides the isolated execution environment for all SecurePass operations.  
+The VM provides the isolated execution environment for all USBeSafe operations.  
 It acts as the backbone of the system by securely running the scanning and file-handling processes without exposing the host to any risk.  
 
 ## Concept  
@@ -159,7 +159,7 @@ This virtual device should operate with dynamic permission controls, starting in
 # 3. CLI (VM Start, USB Script): Paul Ilitz
 
 ## Purpose
-The CLI tool serves as the central orchestrator for the SecurePass workflow, providing a command-line interface that coordinates all components of the system from initial startup through secure file transfer.
+The CLI tool serves as the central orchestrator for the USBeSafe workflow, providing a command-line interface that coordinates all components of the system from initial startup through secure file transfer.
 
 ## Core Responsibilities
 - **VM lifecycle management**: Automatically start, configure, and shut down the virtual machine environment

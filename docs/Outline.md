@@ -1,4 +1,4 @@
-# Paper Outline – SecurePass
+# Paper Outline – USBeSafe
 
 **Abstract**
 

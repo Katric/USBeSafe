@@ -1,4 +1,4 @@
-# Project Diary – **SecurePass**
+# Project Diary – **USBeSafe**
 
 ---
 
@@ -12,7 +12,7 @@
 
 ```mermaid
 gantt
-    title SecurePass – Project Schedule
+    title USBeSafe – Project Schedule
     dateFormat  YYYY-MM-DD
     axisFormat  %d.%m.
 
@@ -47,7 +47,7 @@ gantt
 ### Weeks 1–2: October 16 – 29, 2025  
 *(Creation of the requirements document, role distribution, setup of repositories and development environment, and start of individual research on each work package.)*
 
-In the first project phase, we focused on defining the **scope and foundation** of *SecurePass*.
+In the first project phase, we focused on defining the **scope and foundation** of *USBeSafe*.
 The goal was to clearly describe the use case, define the technical requirements in the **Requirements Specification (Pflichtenheft)**, and set up a common technical and organizational base for the team.
 This included task distribution, creating a shared Git repository, and preparing a clean documentation structure for future development.
 
@@ -56,7 +56,7 @@ This included task distribution, creating a shared Git repository, and preparing
 
     * **Responsible:** *All members*
 
-    The group collaborated on defining the functional and non-functional requirements of the SecurePass system.
+    The group collaborated on defining the functional and non-functional requirements of the USBeSafe system.
     This includes:
 
     - Describing the system’s purpose (USB data transfer via virtualized sandbox environment)
