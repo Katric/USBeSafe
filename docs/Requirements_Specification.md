@@ -31,13 +31,13 @@
 
 | Module / Task | Responsible |
 |-----------------|--------------|
-| **VM / Security environment** | Linus Rode |
-| **Virtual USB stick** | Paul Ilitz |
-| **CLI (VM start, USB script)** | Paul Ilitz |
-| **Virus scan & traffic-light system** | Constantin Scheryer |
-| **Detect BadUSB** | Richard Kats |
-| **USB pass-through Host → VM (interface)** | Tizian Everke |
-| **GUI (automated file management)** | Aaron Debebe |
+| A1 | **VM / Security environment** | Linus Rode |
+| A2 | **Virtual USB stick** | Paul Ilitz |
+| A3 | **CLI (VM start, USB script)** | Paul Ilitz |
+| A4 | **Virus scan & traffic-light system** | Constantin Scheryer |
+| A5 | **Detect BadUSB** | Richard Kats |
+| A6 | **USB pass-through Host → VM (interface)** | Tizian Everke |
+| A7 | **GUI (automated file management)** | Aaron Debebe |
 
 
 ---
