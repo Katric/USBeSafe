@@ -35,7 +35,8 @@
 | **Virtual USB stick** | Paul Ilitz |
 | **CLI (VM start, USB script)** | Paul Ilitz |
 | **Virus scan & traffic-light system** | Constantin Scheryer |
-| **USB pass-through Host → VM (interface)** | Richard Kats, Tizian Everke |
+| **Detect BadUSB** | Richard Kats |
+| **USB pass-through Host → VM (interface)** | Tizian Everke |
 | **GUI (automated file management)** | Aaron Debebe |
 
 
