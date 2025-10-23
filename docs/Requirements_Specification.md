@@ -29,8 +29,8 @@
 
 ## Work Packages & Responsibilities
 
-| Module / Task | Responsible |
-|-----------------|--------------|
+| ID | Module / Task | Responsible |
+|----|-----------------|--------------|
 | A1 | **VM / Security environment** | Linus Rode |
 | A2 | **Virtual USB stick** | Paul Ilitz |
 | A3 | **CLI (VM start, USB script)** | Paul Ilitz |
