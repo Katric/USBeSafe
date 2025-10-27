@@ -13,13 +13,22 @@
 
 ### USBeSafe Workflow
 
-1. Start the USBeSafe app  
-2. Insert the USB stick into the VM  
-3. The file view opens automatically  
-4. Automatic scan (traffic-light system to evaluate security)  
-5. Flagging of compromised files  
-6. Timer starts and automatic VM reset (user can abort)  
-7. Files are verified as safe → a virtual USB can be inserted into the host system  
+1. User activates `usbesafed` via the CLI
+2. `usbesafed` will now block automounting and enumerating USB devices
+2. `usebesafed` creates a virtual USB device and launches a fresh VM
+3. User is informed that USB device can now be plugged in
+4. `usbesafed` intercepts the device and identifies that it actually is a USB device
+5. After examination, `usbesafed` passes the USB device to `usbesafed-vm` inside the VM
+6. `usbesafed-vm` mounts the USB device
+7. `usbesafed-vm` sends metadata of the files to `usbesafed` which sends it to the CLI
+8. The CLI displays the metadata to the user and lets it select files for scanning
+9. The selected files are sent to `usbesafed` which forwards it to `usbesafed-vm`
+10. `usbesafed-vm` executes the scanner on those files, the results are sent back to `usbesafed` and then to the CLI
+11. The CLI displays the scanning results based on their scores (green, yellow, red)
+12. The user selects which scanned files (green/yellow) should be saved on the host
+13. Those files are sent to `usbesafed` which sends it to `usbesafed-vm` and writes it to the virtual USB device
+14. `usbesafed` makes the virtual USB device visible to the user (mount?)
+15. After the session is done (via some user input), `usbesafed` destroys the VM
 
 ### Ideas:
 - [ ] Shared Zotero group for literature? → unified `.bib` file  
@@ -34,19 +43,21 @@
 | A1 | **VM / Security environment** | Linus Rode |
 | A2 | **Virtual USB stick** | Paul Ilitz |
 | A3 | **CLI (VM start, USB script)** | Paul Ilitz |
-| A4 | **Virus scan & traffic-light system** | Constantin Scheryer |
+| A4 | **Virus scan & traffic-light system** | Constantin Schreyer |
 | A5 | **Detect BadUSB** | Richard Kats |
 | A6 | **USB pass-through Host → VM (interface)** | Tizian Everke |
 | A7 | **GUI (automated file management)** | Aaron Debebe |
-| A8 | **Projektleitung** | Linus Rode, Paul Ilitz |
-| A9 | **Modularbeit** | All |
-| A10 | **Zwischenpräsentation** | All |
-| A11 | **Abschlusspräsentation** | All |
+| A8 | **Host side daemon** | Aaron Debebe |
+| A9 | **Guest side daemon** | Linus Rode |
+| A10 | **Projektleitung** | Linus Rode, Paul Ilitz |
+| A11 | **Modularbeit** | All |
+| A12 | **Zwischenpräsentation** | All |
+| A13 | **Abschlusspräsentation** | All |
 
 
 ---
 
-# 1. VM / Security Environment: Linus Rode
+# A1. VM / Security Environment: Linus Rode
 
 ## Purpose  
 The VM provides the isolated execution environment for all USBeSafe operations.  
@@ -106,7 +117,7 @@ A documented and reproducible virtual environment that can start, display a GUI,
 
 ---
 
-# 2. Virtual USB Stick: Paul Ilitz
+# A2. Virtual USB Stick: Paul Ilitz
 
 ## Purpose
 The core concept behind the virtual USB stick is to create a secure intermediary storage space that can be accessed from both the host system and the virtual machine.  
@@ -161,7 +172,7 @@ The main purpose is to deliver the safe files from the VM back to the host syste
 
 ---
 
-# 3. CLI (VM Lifecycle & USB Orchestration): Paul Ilitz
+# A3. CLI (VM Lifecycle & USB Orchestration): Paul Ilitz
 
 ## Purpose
 The CLI serves as the central orchestrator of the USBeSafe workflow. It manages the complete lifecycle of the daemon, detects and handles USB devices, coordinates the malware scanning process and virtual USB mechanism, and provides clear status updates with robust error recovery for the user.
@@ -195,7 +206,7 @@ A production-ready CLI tool implementing the VM/USB workflow, with documented co
 
 ---
 
-# 4. Virus Scan & Traffic-Light System: Constantin Schreyer
+# A4. Virus Scan & Traffic-Light System: Constantin Schreyer
 
 ## Purpose
 The function of virus scan is to provide a file scanner which focusses on being lightweight and configurable. Depending on the specific setting (file types, file sizes, file count etc.) it is able to inspect the files for different types of malware which could harm the host system. The virus scanner returns simple classes for easy understanding of the harm potential of each file.
@@ -213,7 +224,15 @@ For more context, brief reasoning may be provided.
 
 ---
 
-# 5. USB Pass-Through Host → VM (Interface): Tizian Everke & Richard Kats
+# A5. Detect BadUSB: Richard Kats
+
+## Purpose
+
+...
+
+---
+
+# A6. USB Pass-Through Host → VM (Interface): Tizian Everke & Richard Kats
 
 ## Purpose
 
@@ -258,36 +277,73 @@ _(This tutorial also shows how to trust a specific device)_
 
 ---
 
-# 6. GUI (Automated File Management): Aaron Debebe
+# A7. GUI (Automated File Management): Aaron Debebe
 
 ## Purpose
 Providing an intuitive interface for the user to securely interact with an USB device.
 
 ## Features
-1. Automatic File View
-    - GUI (Qt or GTK) should open automatically, displaying the contents of the USB device
-2. Traffic Light Visualization
+1. Option to activate/deactivate host side daemon
+2. File View
+    - GUI (Qt or GTK), displaying the sanitized contents (metadata only) of the USB device
+3. Option to start scanning selected files
+4. Traffic Light Visualization
     - Files are colored based on scan results:
         - Green: Safe
         - Yellow: Potentially suspicious
-        - Red: Malicious
-    - Maybe display animated spinner during scanning
-3. File Operations
+        - Red: Malicious -> encrypt it?
+    - Maybe display animated spinner while scanning
+5. File Operations
     - Copy files to host system after scanning (only Green, maybe Yellow?)
     - Option to select multiple files for transfer
     - Option to delete files?
-4. Timer & VM Reset
+6. Timer & VM Reset
     - A countdown timer is displayed. During the timer, the user can interact with the files.
     - Once the timer expires -> VM reset
-    - Also allow option for the user to abort manually
-5. Communication with other components
-    - virus scanner, CLI tool, etc.
-    - via sockets?
-6. Logging
+    - Also allow option for the user to abort the session/vm manually
+7. Logging
     - Log users action (file selection, transfers, etc.)
-7. Export report
+8. Export report
     - Option to export a report
     - Following should be interesting: metadata (name, size, type, etc.), sha256, (scanners used), scanning result, timestamps
     - The report should be saved on the host system
     - Maybe sign the report?
     - JSON/YAML + PDF/HTML
+## Communication with other components
+- Host side daemon via ICP (unix socket)
+    - activate, deactivate the daemon
+    - request metadata of files of currently connected USB device
+    - request scanning of selected files
+    - file operations
+        - request certain/all files to be written to the virtual USB device by the daemon
+    - reset current vm/abort current session
+
+---
+
+# A8. Host side daemon: Aaron Debebe
+
+## Purpose
+
+Provide communication between the host side components (CLI and GUI) and the guest.
+
+## Features
+
+1. Incorporate USB block+ident (A5)
+2. Create virtual USB device (A2)
+2. Launch a fresh VM with USB passthrough and `virtio-serial` when the daemon gets triggered by CLI/GUI (A1,A7)
+3. Destroy VM after session is done (Timer expired, user abort, etc.)
+4. Redirect requests from CLI/GUI to the guest side daemon and responses back to the CLI/GUI
+    - metadata, scanning, etc.
+5. Copy selected files to the virtual USB device
+
+## Communication with other components
+- Host side components (CLI/GUI) via ICP (unix socket)
+- Guest side daemon via `virtio-serial` channel
+
+---
+
+# A9. Guest side daemon: Linus Rode
+
+## Purpose
+
+...
