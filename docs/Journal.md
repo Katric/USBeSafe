@@ -25,10 +25,11 @@ gantt
     section Implementation
     Implementation of modules / sub-packages                :2025-11-02, 21d
     Integration & internal testing                          :2025-11-23, 10d
+    First working MVP                                       :milestone1, 2025-11-30, 1d
 
     section Presentation 1
     Preparation for mid-term presentation                   :2025-11-30, 5d
-    Mid-term presentation                                   :milestone1, 2025-12-04, 1d
+    Mid-term presentation                                   :milestone2, 2025-12-04, 1d
 
     section Documentation & Module Reports
     Creation of individual module reports                   :2025-12-05, 28d
@@ -36,7 +37,7 @@ gantt
 
     section Presentation 2 & Completion
     Preparation for final presentation                      :2026-01-15, 7d
-    Final presentation                                      :milestone2, 2026-01-22, 1d
+    Final presentation                                      :milestone3, 2026-01-22, 1d
     Finishing touches & submission                          :2026-01-23, 3d
 ```
 

@@ -38,6 +38,10 @@
 | A5 | **Detect BadUSB** | Richard Kats |
 | A6 | **USB pass-through Host → VM (interface)** | Tizian Everke |
 | A7 | **GUI (automated file management)** | Aaron Debebe |
+| A8 | **Projektleitung** | Linus Rode, Paul Ilitz |
+| A9 | **Modularbeit** | All |
+| A10 | **Zwischenpräsentation** | All |
+| A11 | **Abschlusspräsentation** | All |
 
 
 ---
@@ -106,10 +110,11 @@ A documented and reproducible virtual environment that can start, display a GUI,
 
 ## Purpose
 The core concept behind the virtual USB stick is to create a secure intermediary storage space that can be accessed from both the host system and the virtual machine.  
-This virtual device should operate with dynamic permission controls, starting in a read-only mode and transitioning to read-write access only after the scanned data has been verified as clean.
+This virtual device should operate with dynamic permission controls, starting in a read-only mode and transitioning to read-write access only after the scanned data has been verified as clean.  
+The main purpose is to deliver the safe files from the VM back to the host system.
 
 ## Workflow of the virtual USB-Stick
-1. When the VM is started by the CLI script, a virtual USB stick will be automatically created
+1. When the Deamon is started by the CLI script, a virtual USB stick will be automatically created
 2. Initially, this virtual device will be mounted as read-only for both the host system and the VM
 3. The size of the virtual USB stick will be dynamically adjusted to match either the file size of the data on the physical USB stick or the total capacity of the USB stick itself
 4. Once the malware scanning process completes, the system will respond based on the scan results:
@@ -118,10 +123,9 @@ This virtual device should operate with dynamic permission controls, starting in
 	    - The user will be presented with the option to select which files should be transferred to the host system, providing granular control over data flow
 	- **If any files are flagged as red (malicious):**  
  	    - The system will initiate an automatic cleanup procedure  
-   	    - The virtual USB stick will be destroyed after a 30-second countdown  
-        - The entire VM will be rebuilt to ensure no persistence of potentially malicious code  
-5. When the VM or CLI script is terminated, either manually by the user or automatically by the system:
-	- The virtual USB stick and all files stored on it will be immediately deleted
+   	    - The virtual USB stick will be destroyed after a 30-second countdown
+5. When the VMor Daemon is terminated, either manually by the user or automatically by the system:
+	- The virtual USB stick and all files stored on it will be immediately deleted [or should the virtual stick stay to keep the safe data?]
 	- This ensures that no residual data remains that could pose a security risk
 
 ## Security Considerations
@@ -157,33 +161,37 @@ This virtual device should operate with dynamic permission controls, starting in
 
 ---
 
-# 3. CLI (VM Start, USB Script): Paul Ilitz
+# 3. CLI (VM Lifecycle & USB Orchestration): Paul Ilitz
 
 ## Purpose
-The CLI tool serves as the central orchestrator for the USBeSafe workflow, providing a command-line interface that coordinates all components of the system from initial startup through secure file transfer.
+The CLI serves as the central orchestrator of the USBeSafe workflow. It manages the complete lifecycle of the daemon, detects and handles USB devices, coordinates the malware scanning process and virtual USB mechanism, and provides clear status updates with robust error recovery for the user.
 
 ## Core Responsibilities
-- **VM lifecycle management**: Automatically start, configure, and shut down the virtual machine environment
-- **USB detection and handling**: Monitor for USB device insertion and coordinate the pass-through to the VM
-- **Component coordination**: Act as the communication hub between the GUI, virus scanner, virtual USB stick, and VM
-- **User interaction**: Provide clear command-line prompts and status updates throughout the scanning process
-- **Error handling**: Gracefully manage exceptions and ensure safe cleanup in case of failures
+- **VM lifecycle management**: Start, monitor, configure, and securely destroy or reset the virtual machine
+- **USB detection and handling**: Monitor device insertion, classify device type (storage vs. other usb devices), disable host automounting, and coordinate safe passthrough to the VM
+- **Component coordination**: Serve as the control plane between GUI, scanner, virtual USB device, and VM, exposing a stable connection for other modules
+- **User interaction**: Provide concise, actionable command-line prompts, progress indicators, and final reports
+- **Robust error handling and cleanup**: Ensure deterministic rollback, VM shutdown, and removal of temporary artifacts on any failure
 
-## Workflow Integration
-The CLI script will be implemented in a language suitable for system-level operations (likely Rust or Python) and will:
-1. Initialize the secure VM environment with appropriate security settings
-2. Wait for and detect USB device insertion events
-3. Trigger the USB pass-through mechanism to forward the device to the VM
-4. Launch the VM
-5. Coordinate with the virus scanner to initiate malware detection
-6. Manage the virtual USB stick creation, mounting, and destruction based on scan results
-7. Handle graceful shutdown and cleanup of all resources
+## User-Facing Commands
+The CLI exposes a composable command set that supports both interactive and automated use:
+1. `daemon start | stop` — Run a background manager that prepares the environment (disable automount, pre-create virtual USB, enforce policies, handle vm)
+2. `list-devices | watch-devices` — Enumerate attached USB devices and monitor for insertion events
+3. `scan [--paths ...]` — Execute malware scans inside the VM; allow interactive or batch selection of files to scan
+4. `transfer` — After successful scanning, select files to copy to the virtual USB and enable controlled host access
+5. `vm restart | destroy` — Reset the VM to a clean base image
+6. `config [show|edit]` — Manage settings (VM image, timeouts, scan engines, security policies)
 
 ## Technical Considerations
-- **Cross-platform compatibility**: Ensure the CLI works seamlessly on the target Linux distribution
-- **Privilege management**: Handle necessary elevated permissions for VM operations and USB access
-- **Logging**: Maintain detailed logs of all operations for troubleshooting and security auditing
-- **Configuration**: Support configuration files for customizing VM settings, timeout values, and security policies
+- **Target platform**: Linux
+- **Privilege model**: Clearly document required elevated permissions and minimize the privileged footprint
+- **Security**: Default-deny approach — guest has no network access, no shared mounts, and the virtual USB remains read-only until files are approved
+- **Implementation language**: Go or Python, chosen for system-level capabilities and cross-platform support
+- **Observability**: Structured logs and machine-readable outputs (JSON) for integration with GUI and automation
+- **Configuration**: Support human-editable config files (YAML/TOML/INI) with environment variable overrides
+
+## Deliverable
+A production-ready CLI tool implementing the VM/USB workflow, with documented commands, example configuration, comprehensive logging, and clear instructions for required privileges and platform setup.
 
 ---
 
