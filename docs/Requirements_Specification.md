@@ -328,6 +328,7 @@ Provide communication between the host side components (CLI and GUI) and the gue
 
 ## Features
 
+0. As `systemd` service?
 1. Incorporate USB block+ident (A5)
 2. Create virtual USB device (A2)
 2. Launch a fresh VM with USB passthrough and `virtio-serial` when the daemon gets triggered by CLI/GUI (A1,A7)
