@@ -60,7 +60,7 @@ fn main() {
     vm.launch_vm();
 
     thread::spawn(move || {
-        ipc.run("/var/tmp/usebsafed.sock");
+        ipc.run("/opt/usbesafe/run/usbesafed.sock");
     });
 
     println!("usbesafed running. Press Enter to exit.");
