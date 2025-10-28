@@ -91,6 +91,107 @@ This included task distribution, creating a shared Git repository, and preparing
     Research began into possible scanning tools and frameworks.
     The focus was on lightweight and scriptable options such as **ClamAV**, along with ideas for an **“ampel” (traffic-light)** scoring system to visually indicate scan results.
 
+* **Detection of BadUSB**
+  * **Responsible:** *Tizian Everke & Richard Kats*
+  
+  We identified that USB Devices with malicious firmware that makes e.g. a USB Stick identify as a Keyboard are an additional attack vector. Therefore, it should be 
+taken into account during the development of USBeSafe.
+  * [USBGuard](https://usbguard.github.io/) Tool from RedHat
+    * Provides White- and Blacklisting capabilities
+    * uses the USB Authorization Feature (in Kernel) => source [Linux-Bibel](https://linux-bibel.at/index.php/2024/07/31/usb-guard-reglementierung-von-usb-geraeten/)
+  * **Investigations**
+    * Set `authorized_default` of USB busses to `0` (= don't authorize new devices)
+      * -> `echo 0 | sudo tee /sys/bus/usb/devices/usb[1-9]+/authorized_default`
+      * Resets back to `1` after PC gets restarted -> write 0's at start of daemon
+      * **Plug in USB Devices**
+        * USB Stick:
+          * authorized_default 1
+            * `lsusb` shows USB Stick:  
+              `Bus 002 Device 002: ID 0781:5581 SanDisk Corp. Ultra`
+            * `usb-devices`
+              ```
+              T:  Bus=02 Lev=01 Prnt=01 Port=00 Cnt=01 Dev#=  4 Spd=5000 MxCh= 0
+              D:  Ver= 3.20 Cls=00(>ifc ) Sub=00 Prot=00 MxPS= 9 #Cfgs=  1
+              P:  Vendor=0781 ProdID=5581 Rev=01.00
+              S:  Manufacturer=SanDisk
+              S:  Product=Ultra
+              S:  SerialNumber=030189e6db153dda20e91b2e0311403338c7499c48ae1f29fe05130fe2e40cc1e0bb000000000000000000005042ac84ff144b08815581079c26b449
+              C:  #Ifs= 1 Cfg#= 1 Atr=80 MxPwr=896mA
+              I:  If#= 0 Alt= 0 #EPs= 2 Cls=08(stor.) Sub=06 Prot=50 Driver=usb-storage
+              E:  Ad=02(O) Atr=02(Bulk) MxPS=1024 Ivl=0ms
+              E:  Ad=81(I) Atr=02(Bulk) MxPS=1024 Ivl=0ms
+              ```
+          * authorized_default 0
+            * `lsusb` shows USB Stick (see above)
+            * `usb-devices`
+              ```
+              T:  Bus=02 Lev=01 Prnt=01 Port=00 Cnt=01 Dev#=  3 Spd=5000 MxCh= 0
+              D:  Ver= 3.20 Cls=00(>ifc ) Sub=00 Prot=00 MxPS= 9 #Cfgs=  1
+              P:  Vendor=0781 ProdID=5581 Rev=01.00
+              S:  Manufacturer=SanDisk
+              S:  Product=Ultra
+              S:  SerialNumber=030189e6db153dda20e91b2e0311403338c7499c48ae1f29fe05130fe2e40cc1e0bb000000000000000000005042ac84ff144b08815581079c26b449
+              C:  #Ifs= 0 Cfg#= 0 Atr= MxPwr=
+              /usr/bin/usb-devices: 89: cannot open /sys/bus/usb/devices/usb2/2-1/2-*:?.*/bInterfaceNumber: No such file
+              /usr/bin/usb-devices: 90: cannot open /sys/bus/usb/devices/usb2/2-1/2-*:?.*/bAlternateSetting: No such file
+              /usr/bin/usb-devices: 91: cannot open /sys/bus/usb/devices/usb2/2-1/2-*:?.*/bNumEndpoints: No such file
+              /usr/bin/usb-devices: 92: cannot open /sys/bus/usb/devices/usb2/2-1/2-*:?.*/bInterfaceClass: No such file
+              /usr/bin/usb-devices: 93: cannot open /sys/bus/usb/devices/usb2/2-1/2-*:?.*/bInterfaceSubClass: No such file
+              /usr/bin/usb-devices: 94: cannot open /sys/bus/usb/devices/usb2/2-1/2-*:?.*/bInterfaceProtocol: No such file
+              I:  If#= 0 Alt= 0 #EPs= 1 Cls=09(hub  ) Sub=00 Prot=00 Driver=(none)
+              ```
+            * Keyboard
+              * authorized_default 1
+                * `lsusb` shows Keyboard:  
+                  `Bus 001 Device 021: ID 1ea7:2007 SHARKOON Technologies GmbH SHARK ZONE K30 Illuminated Gaming Keyboard`
+                * `usb-devices`
+                  ```
+                  T:  Bus=01 Lev=01 Prnt=01 Port=00 Cnt=01 Dev#= 21 Spd=12   MxCh= 0
+                  D:  Ver= 2.00 Cls=00(>ifc ) Sub=00 Prot=00 MxPS= 8 #Cfgs=  1
+                  P:  Vendor=1ea7 ProdID=2007 Rev=01.06
+                  S:  Manufacturer=WFDZ
+                  S:  Product=Gaming Keyboard
+                  C:  #Ifs= 2 Cfg#= 1 Atr=a0 MxPwr=100mA
+                  I:  If#= 0 Alt= 0 #EPs= 1 Cls=03(HID  ) Sub=01 Prot=01 Driver=usbhid
+                  E:  Ad=81(I) Atr=03(Int.) MxPS=   8 Ivl=1ms
+                  I:  If#= 1 Alt= 0 #EPs= 1 Cls=03(HID  ) Sub=00 Prot=00 Driver=usbhid
+                  E:  Ad=82(I) Atr=03(Int.) MxPS=  32 Ivl=1ms
+                  ```
+              * authorized_default 0
+              * `lsusb` shows Keyboard (see above)
+              * `usb-devices`
+                ```
+                T:  Bus=01 Lev=01 Prnt=01 Port=00 Cnt=01 Dev#= 22 Spd=12   MxCh= 0
+                D:  Ver= 2.00 Cls=00(>ifc ) Sub=00 Prot=00 MxPS= 8 #Cfgs=  1
+                P:  Vendor=1ea7 ProdID=2007 Rev=01.06
+                S:  Manufacturer=WFDZ
+                S:  Product=Gaming Keyboard
+                C:  #Ifs= 0 Cfg#= 0 Atr= MxPwr=
+                /usr/bin/usb-devices: 89: cannot open /sys/bus/usb/devices/usb1/1-1/1-*:?.*/bInterfaceNumber: No such file
+                /usr/bin/usb-devices: 90: cannot open /sys/bus/usb/devices/usb1/1-1/1-*:?.*/bAlternateSetting: No such file
+                /usr/bin/usb-devices: 91: cannot open /sys/bus/usb/devices/usb1/1-1/1-*:?.*/bNumEndpoints: No such file
+                /usr/bin/usb-devices: 92: cannot open /sys/bus/usb/devices/usb1/1-1/1-*:?.*/bInterfaceClass: No such file
+                /usr/bin/usb-devices: 93: cannot open /sys/bus/usb/devices/usb1/1-1/1-*:?.*/bInterfaceSubClass: No such file
+                /usr/bin/usb-devices: 94: cannot open /sys/bus/usb/devices/usb1/1-1/1-*:?.*/bInterfaceProtocol: No such file
+                I:  If#= 0 Alt= 0 #EPs= 1 Cls=09(hub  ) Sub=00 Prot=00 Driver=(none)
+                ```
+      * **Observations**
+        * When `authorized_default` is set to 0...
+          * driver is always `none` -> it is not loaded
+          * metadata is available (vendor, product, ...)
+          * `Dev#` gets incremented when device is reinserted
+          * Keyboard lights are off
+          * USB Stick is not mounted
+          * Keyboard is not usable
+        * When `authorized_default` is set to 1...
+          * Keyboard loads driver `usbhid`
+          * USB Stick loads driver `usb-storge`
+      * **TODO**
+        * [ ] Can we see USB Events in [udev monitor crate](https://crates.io/crates/udev)? (when authorized_default is 0)
+        * [ ] Can we forward an unauthorized usb stick to the VM?
+        * [ ] Can we still see the type of device?
+        
+
 
 * **USB Pass-Through (Host → VM)**
 
