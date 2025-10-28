@@ -38,21 +38,21 @@
 
 ## Work Packages & Responsibilities
 
-| ID | Module / Task | Responsible |
-|----|-----------------|--------------|
-| A1 | **VM / Security environment** | Linus Rode |
-| A2 | **Virtual USB stick** | Paul Ilitz |
-| A3 | **CLI (VM start, USB script)** | Paul Ilitz |
-| A4 | **Virus scan & traffic-light system** | Constantin Schreyer |
-| A5 | **Detect BadUSB** | Richard Kats |
-| A6 | **USB pass-through Host → VM (interface)** | Tizian Everke |
-| A7 | **GUI (automated file management)** | Aaron Debebe |
-| A8 | **Host side daemon** | Aaron Debebe |
-| A9 | **Guest side daemon** | Linus Rode |
-| A10 | **Projektleitung** | Linus Rode, Paul Ilitz |
-| A11 | **Modularbeit** | All |
-| A12 | **Zwischenpräsentation** | All |
-| A13 | **Abschlusspräsentation** | All |
+| ID  | Module / Task                              | Responsible                  |
+|-----|--------------------------------------------|------------------------------|
+| A1  | **VM / Security environment**              | Linus Rode                   |
+| A2  | **Virtual USB stick**                      | Paul Ilitz                   |
+| A3  | **CLI (VM start, USB script)**             | Paul Ilitz                   |
+| A4  | **Virus scan & traffic-light system**      | Constantin Schreyer          |
+| A5  | **Detect BadUSB**                          | Richard Kats & Tizian Everke |
+| A6  | **USB pass-through Host → VM (interface)** | Richard Kats & Tizian Everke |
+| A7  | **GUI (automated file management)**        | Aaron Debebe                 |
+| A8  | **Host side daemon**                       | Aaron Debebe                 |
+| A9  | **Guest side daemon**                      | Linus Rode                   |
+| A10 | **Projektleitung**                         | Linus Rode, Paul Ilitz       |
+| A11 | **Modularbeit**                            | All                          |
+| A12 | **Zwischenpräsentation**                   | All                          |
+| A13 | **Abschlusspräsentation**                  | All                          |
 
 
 ---
