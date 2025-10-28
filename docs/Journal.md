@@ -141,43 +141,43 @@ taken into account during the development of USBeSafe.
               /usr/bin/usb-devices: 94: cannot open /sys/bus/usb/devices/usb2/2-1/2-*:?.*/bInterfaceProtocol: No such file
               I:  If#= 0 Alt= 0 #EPs= 1 Cls=09(hub  ) Sub=00 Prot=00 Driver=(none)
               ```
-            * Keyboard
-              * authorized_default 1
-                * `lsusb` shows Keyboard:  
-                  `Bus 001 Device 021: ID 1ea7:2007 SHARKOON Technologies GmbH SHARK ZONE K30 Illuminated Gaming Keyboard`
-                * `usb-devices`
-                  ```
-                  T:  Bus=01 Lev=01 Prnt=01 Port=00 Cnt=01 Dev#= 21 Spd=12   MxCh= 0
-                  D:  Ver= 2.00 Cls=00(>ifc ) Sub=00 Prot=00 MxPS= 8 #Cfgs=  1
-                  P:  Vendor=1ea7 ProdID=2007 Rev=01.06
-                  S:  Manufacturer=WFDZ
-                  S:  Product=Gaming Keyboard
-                  C:  #Ifs= 2 Cfg#= 1 Atr=a0 MxPwr=100mA
-                  I:  If#= 0 Alt= 0 #EPs= 1 Cls=03(HID  ) Sub=01 Prot=01 Driver=usbhid
-                  E:  Ad=81(I) Atr=03(Int.) MxPS=   8 Ivl=1ms
-                  I:  If#= 1 Alt= 0 #EPs= 1 Cls=03(HID  ) Sub=00 Prot=00 Driver=usbhid
-                  E:  Ad=82(I) Atr=03(Int.) MxPS=  32 Ivl=1ms
-                  ```
-              * authorized_default 0
-              * `lsusb` shows Keyboard (see above)
-              * `usb-devices`
-                ```
-                T:  Bus=01 Lev=01 Prnt=01 Port=00 Cnt=01 Dev#= 22 Spd=12   MxCh= 0
-                D:  Ver= 2.00 Cls=00(>ifc ) Sub=00 Prot=00 MxPS= 8 #Cfgs=  1
-                P:  Vendor=1ea7 ProdID=2007 Rev=01.06
-                S:  Manufacturer=WFDZ
-                S:  Product=Gaming Keyboard
-                C:  #Ifs= 0 Cfg#= 0 Atr= MxPwr=
-                /usr/bin/usb-devices: 89: cannot open /sys/bus/usb/devices/usb1/1-1/1-*:?.*/bInterfaceNumber: No such file
-                /usr/bin/usb-devices: 90: cannot open /sys/bus/usb/devices/usb1/1-1/1-*:?.*/bAlternateSetting: No such file
-                /usr/bin/usb-devices: 91: cannot open /sys/bus/usb/devices/usb1/1-1/1-*:?.*/bNumEndpoints: No such file
-                /usr/bin/usb-devices: 92: cannot open /sys/bus/usb/devices/usb1/1-1/1-*:?.*/bInterfaceClass: No such file
-                /usr/bin/usb-devices: 93: cannot open /sys/bus/usb/devices/usb1/1-1/1-*:?.*/bInterfaceSubClass: No such file
-                /usr/bin/usb-devices: 94: cannot open /sys/bus/usb/devices/usb1/1-1/1-*:?.*/bInterfaceProtocol: No such file
-                I:  If#= 0 Alt= 0 #EPs= 1 Cls=09(hub  ) Sub=00 Prot=00 Driver=(none)
-                ```
+        * Keyboard
+          * authorized_default 1
+            * `lsusb` shows Keyboard:  
+              `Bus 001 Device 021: ID 1ea7:2007 SHARKOON Technologies GmbH SHARK ZONE K30 Illuminated Gaming Keyboard`
+            * `usb-devices`
+              ```
+              T:  Bus=01 Lev=01 Prnt=01 Port=00 Cnt=01 Dev#= 21 Spd=12   MxCh= 0
+              D:  Ver= 2.00 Cls=00(>ifc ) Sub=00 Prot=00 MxPS= 8 #Cfgs=  1
+              P:  Vendor=1ea7 ProdID=2007 Rev=01.06
+              S:  Manufacturer=WFDZ
+              S:  Product=Gaming Keyboard
+              C:  #Ifs= 2 Cfg#= 1 Atr=a0 MxPwr=100mA
+              I:  If#= 0 Alt= 0 #EPs= 1 Cls=03(HID  ) Sub=01 Prot=01 Driver=usbhid
+              E:  Ad=81(I) Atr=03(Int.) MxPS=   8 Ivl=1ms
+              I:  If#= 1 Alt= 0 #EPs= 1 Cls=03(HID  ) Sub=00 Prot=00 Driver=usbhid
+              E:  Ad=82(I) Atr=03(Int.) MxPS=  32 Ivl=1ms
+              ```
+          * authorized_default 0
+            * `lsusb` shows Keyboard (see above)
+            * `usb-devices`
+              ```
+              T:  Bus=01 Lev=01 Prnt=01 Port=00 Cnt=01 Dev#= 22 Spd=12   MxCh= 0
+              D:  Ver= 2.00 Cls=00(>ifc ) Sub=00 Prot=00 MxPS= 8 #Cfgs=  1
+              P:  Vendor=1ea7 ProdID=2007 Rev=01.06
+              S:  Manufacturer=WFDZ
+              S:  Product=Gaming Keyboard
+              C:  #Ifs= 0 Cfg#= 0 Atr= MxPwr=
+              /usr/bin/usb-devices: 89: cannot open /sys/bus/usb/devices/usb1/1-1/1-*:?.*/bInterfaceNumber: No such file
+              /usr/bin/usb-devices: 90: cannot open /sys/bus/usb/devices/usb1/1-1/1-*:?.*/bAlternateSetting: No such file
+              /usr/bin/usb-devices: 91: cannot open /sys/bus/usb/devices/usb1/1-1/1-*:?.*/bNumEndpoints: No such file
+              /usr/bin/usb-devices: 92: cannot open /sys/bus/usb/devices/usb1/1-1/1-*:?.*/bInterfaceClass: No such file
+              /usr/bin/usb-devices: 93: cannot open /sys/bus/usb/devices/usb1/1-1/1-*:?.*/bInterfaceSubClass: No such file
+              /usr/bin/usb-devices: 94: cannot open /sys/bus/usb/devices/usb1/1-1/1-*:?.*/bInterfaceProtocol: No such file
+              I:  If#= 0 Alt= 0 #EPs= 1 Cls=09(hub  ) Sub=00 Prot=00 Driver=(none)
+              ```
       * **Observations**
-        * When `authorized_default` is set to 0...
+        * When `authorized_default` is set to `0`...
           * driver is always `none` -> it is not loaded
           * metadata is available (vendor, product, ...)
           * `Dev#` gets incremented when device is reinserted
@@ -191,7 +191,6 @@ taken into account during the development of USBeSafe.
         * [ ] Can we see USB Events in [udev monitor crate](https://crates.io/crates/udev)? (when authorized_default is 0)
         * [ ] Can we forward an unauthorized usb stick to the VM?
         * [ ] Can we still see the type of device?
-        
 
 
 * **USB Pass-Through (Host → VM)**
