@@ -91,6 +91,7 @@ This included task distribution, creating a shared Git repository, and preparing
     Research began into possible scanning tools and frameworks.
     The focus was on lightweight and scriptable options such as **ClamAV**, along with ideas for an **“ampel” (traffic-light)** scoring system to visually indicate scan results.
 
+
 * **Detection of BadUSB**
   * **Responsible:** *Tizian Everke & Richard Kats*
   
