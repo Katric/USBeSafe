@@ -18,6 +18,8 @@ temp/
 .vscode/
 .idea/
 *.iml
+*.swp
+.obsidian
 
 # --- Secrets (never commit) ---
 .env
