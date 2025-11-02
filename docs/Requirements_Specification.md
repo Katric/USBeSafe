@@ -46,6 +46,7 @@ sequenceDiagram
     usbesafed->>usbesafed: Block automounting & enumeration
     usbesafed->>vUSB: Create virtual USB device
     usbesafed->>VM: Launch fresh VM
+    usbesafed->>VM: Mount virtual USB
     usbesafed->>User: Ready - plug in USB device
     
     User->>PhysicalUSB: Insert USB device
@@ -71,9 +72,9 @@ sequenceDiagram
     User->>CLI: Select files to save (green/yellow)
     CLI->>usbesafed: Send file selection
     usbesafed->>usbesafed-vm: Request selected files
-    usbesafed-vm->>usbesafed: Transfer files
-    usbesafed->>vUSB: Write files to virtual USB
+    usbesafed-vm->>vUSB: Transfer files
     usbesafed->>User: Make virtual USB visible (mount)
+    User->>vUSB: Acess Files on virtual USB
     
     User->>CLI: End session
     CLI->>usbesafed: Terminate session
