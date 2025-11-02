@@ -1,0 +1,25 @@
+[project]
+name = "usbesafe-cli"
+version = "0.1.0"
+description = "USBeSafe CLI - Central orchestrator for secure USB device handling with automated malware scanning"
+readme = "README_CLI.md"
+requires-python = ">=3.9"
+dependencies = [
+    "click>=8.1.0",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+usbesafe = "usbesafe_cli.main:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "ruff>=0.1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

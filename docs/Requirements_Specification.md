@@ -204,7 +204,7 @@ The CLI exposes a composable command set that supports both interactive and auto
 - **Target platform**: Linux
 - **Privilege model**: Clearly document required elevated permissions and minimize the privileged footprint
 - **Security**: Default-deny approach — guest has no network access, no shared mounts, and the virtual USB remains read-only until files are approved
-- **Implementation language**: Go or Python, chosen for system-level capabilities and cross-platform support
+- **Implementation language**: Python with [click](https://click.palletsprojects.com/en/stable/entry-points/) as main Framework, chosen for system-level capabilities and cross-platform support
 - **Observability**: Structured logs and machine-readable outputs (JSON) for integration with GUI and automation
 - **Configuration**: Support human-editable config files (YAML/TOML/INI) with environment variable overrides
 
