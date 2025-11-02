@@ -15,7 +15,7 @@
 
 1. User activates `usbesafed` via the CLI
 2. `usbesafed` will now block automounting and enumerating USB devices
-2. `usebesafed` creates a virtual USB device and launches a fresh VM
+2. `usbesafed` creates a virtual USB device and launches a fresh VM
 3. User is informed that USB device can now be plugged in
 4. `usbesafed` intercepts the device and identifies that it actually is a USB device
 5. After examination, `usbesafed` passes the USB device to `usbesafed-vm` inside the VM
@@ -164,6 +164,13 @@ The main purpose is to deliver the safe files from the VM back to the host syste
   - Requires careful filesystem operations
   - Presents challenges in dynamic size management
 
+## Overlapping Points with Other Modules  
+- Must be created and managed by **A8 (Host side daemon)** at startup
+- Must be mounted and accessible to both the host system and the VM in **A1 (VM / Security Environment)**
+- Must accept scanned files from **A9 (Guest side daemon)** after successful malware verification
+- Must integrate with **A3 (CLI)** and **A7 (GUI)** for file transfer operations
+- Must enforce read-only/read-write permissions based on scan results from **A4 (Virus scan)**
+
 ## Sources
 - [How to create a disk image](https://unix.stackexchange.com/questions/328156/create-virtual-usb-drive) -> [fallocate](https://man7.org/linux/man-pages/man1/fallocate.1.html)
 - [Linus MSG](https://www.kernel.org/doc/Documentation/usb/mass-storage.txt)
@@ -203,6 +210,15 @@ The CLI exposes a composable command set that supports both interactive and auto
 
 ## Deliverable
 A production-ready CLI tool implementing the VM/USB workflow, with documented commands, example configuration, comprehensive logging, and clear instructions for required privileges and platform setup.
+
+## Overlapping Points with Other Modules  
+- Must start, configure, and control **A8 (Host side daemon)** lifecycle
+- Must coordinate with **A5 (Detect BadUSB)** and **A6 (USB pass-through)** for device detection and classification
+- Must trigger creation of **A2 (Virtual USB stick)** through the daemon
+- Must launch and manage **A1 (VM / Security Environment)** instances
+- Must initiate and orchestrate **A4 (Virus scan)** execution inside the VM
+- Must communicate with **A9 (Guest side daemon)** for file operations and scan results
+- Is used by **A7 (GUI)** 
 
 ---
 
