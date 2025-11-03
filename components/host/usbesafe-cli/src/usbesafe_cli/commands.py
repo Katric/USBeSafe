@@ -8,7 +8,6 @@ import sys
 
 from .config import Config
 from .daemon import DaemonManager
-from .usb import USBDeviceManager
 from .vm import VMManager
 from .scanner import ScannerCoordinator
 from .virtual_usb import VirtualUSBManager
@@ -27,10 +26,48 @@ def cli(ctx):
     ctx.ensure_object(dict)
     ctx.obj['config'] = Config()
     ctx.obj['daemon'] = DaemonManager()
-    ctx.obj['usb'] = USBDeviceManager()
     ctx.obj['vm'] = VMManager()
     ctx.obj['scanner'] = ScannerCoordinator()
     ctx.obj['vusb'] = VirtualUSBManager()
+
+@cli.command()
+def hello():
+    """Simple test command to verify CLI is working"""
+    click.echo("Hello from USBeSafe CLI!")
+
+@cli.command()
+@click.pass_context
+def start(ctx):
+    """Start USBeSafe services"""
+    daemon_mgr = ctx.obj['daemon']
+    vm_mgr = ctx.obj['vm']
+    
+    if not daemon_mgr.start():
+        click.echo("✗ Failed to start daemon", err=True)
+        sys.exit(1)
+    
+    if not vm_mgr.start():
+        click.echo("✗ Failed to start VM", err=True)
+        sys.exit(1)
+    
+    click.echo("✓ USBeSafe services started successfully") 
+
+@cli.command()
+@click.pass_context
+def stop(ctx):
+    """Stop USBeSafe services"""
+    daemon_mgr = ctx.obj['daemon']
+    vm_mgr = ctx.obj['vm']
+    
+    if not vm_mgr.stop():
+        click.echo("✗ Failed to stop VM", err=True)
+        sys.exit(1)
+    
+    if not daemon_mgr.stop():
+        click.echo("✗ Failed to stop daemon", err=True)
+        sys.exit(1)
+    
+    click.echo("✓ USBeSafe services stopped successfully")
 
 
 # ============================================================================
@@ -42,31 +79,6 @@ def daemon():
     """Manage the USBeSafe background daemon"""
     pass
 
-
-@daemon.command()
-@click.pass_context
-def start(ctx):
-    """Start the background daemon"""
-    daemon_mgr = ctx.obj['daemon']
-    if daemon_mgr.start():
-        click.echo("✓ Daemon started successfully", err=False)
-    else:
-        click.echo("✗ Failed to start daemon", err=True)
-        sys.exit(1)
-
-
-@daemon.command()
-@click.pass_context
-def stop(ctx):
-    """Stop the background daemon"""
-    daemon_mgr = ctx.obj['daemon']
-    if daemon_mgr.stop():
-        click.echo("✓ Daemon stopped successfully", err=False)
-    else:
-        click.echo("✗ Failed to stop daemon", err=True)
-        sys.exit(1)
-
-
 @daemon.command()
 @click.pass_context
 def status(ctx):
@@ -74,47 +86,6 @@ def status(ctx):
     daemon_mgr = ctx.obj['daemon']
     status_info = daemon_mgr.get_status()
     click.echo(json.dumps(status_info, indent=2))
-
-
-# ============================================================================
-# USB Device Commands
-# ============================================================================
-
-@cli.command()
-@click.option('--json', 'output_json', is_flag=True, help='Output in JSON format')
-@click.pass_context
-def list_devices(ctx, output_json):
-    """List all attached USB devices"""
-    usb_mgr = ctx.obj['usb']
-    devices = usb_mgr.list_devices()
-    
-    if output_json:
-        click.echo(json.dumps(devices, indent=2))
-    else:
-        if not devices:
-            click.echo("No USB devices found")
-        else:
-            for idx, device in enumerate(devices, 1):
-                click.echo(f"{idx}. {device.get('name', 'Unknown')} - {device.get('path', 'N/A')}")
-
-
-@cli.command()
-@click.option('--json', 'output_json', is_flag=True, help='Output events in JSON format')
-@click.pass_context
-def watch_devices(ctx, output_json):
-    """Monitor for USB device insertion events"""
-    usb_mgr = ctx.obj['usb']
-    
-    def on_device_event(event):
-        if output_json:
-            click.echo(json.dumps(event))
-        else:
-            click.echo(f"Device {event.get('action', 'unknown')}: {event.get('path', 'N/A')}")
-    
-    try:
-        usb_mgr.watch_devices(on_device_event)
-    except KeyboardInterrupt:
-        click.echo("\nStopped watching devices")
 
 
 # ============================================================================
@@ -184,32 +155,6 @@ def transfer(ctx, files, auto_approve):
 def vm():
     """Manage the virtual machine"""
     pass
-
-
-@vm.command(name='start')
-@click.option('--image', type=click.Path(exists=True), help='VM image path')
-@click.pass_context
-def start_vm(ctx, image):
-    """Start the virtual machine"""
-    vm_mgr = ctx.obj['vm']
-    if vm_mgr.start(image):
-        click.echo("✓ VM started successfully")
-    else:
-        click.echo("✗ Failed to start VM", err=True)
-        sys.exit(1)
-
-
-@vm.command(name='stop')
-@click.pass_context
-def stop_vm(ctx):
-    """Stop the virtual machine"""
-    vm_mgr = ctx.obj['vm']
-    if vm_mgr.stop():
-        click.echo("✓ VM stopped successfully")
-    else:
-        click.echo("✗ Failed to stop VM", err=True)
-        sys.exit(1)
-
 
 @vm.command(name='restart')
 @click.pass_context
