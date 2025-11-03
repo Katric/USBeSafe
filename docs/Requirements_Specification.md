@@ -33,16 +33,20 @@
 ```mermaid
 sequenceDiagram
     actor User
+    participant systemd
+    participant PhysicalUSB as Physical USB Device
     participant CLI
     participant usbesafed as usbesafed (Host Daemon)
     participant vUSB as Virtual USB Device
     participant VM
     participant usbesafed-vm as usbesafed-vm (Guest Daemon)
     participant Scanner
-    participant PhysicalUSB as Physical USB Device
 
-    User->>CLI: Activate usbesafed
-    CLI->>usbesafed: Start daemon
+    User ->>systemd: Boot host system
+    systemd ->> usbesafed: Start daemon
+    usbesafed ->> usbesafed: Idle  
+    User->>CLI: "usbesafe start"
+    CLI->>usbesafed: Activate daemon
     usbesafed->>usbesafed: Block automounting & enumeration
     usbesafed->>vUSB: Create virtual USB device
     usbesafed->>VM: Launch fresh VM
