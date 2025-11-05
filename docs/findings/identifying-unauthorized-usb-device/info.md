@@ -106,7 +106,7 @@ Using VID and PID:
 
 ```bash
 virsh attach-device <vm-name>\
-  <(echo "<hostdev mode='subsystem' type='usb' managed='yes'>
+  <(echo "<hostdev mode='subsystem' type='usb' managed='no'>
      <source>
        <vendor id='0x1234'/>
        <product id='0x5678'/>
@@ -119,7 +119,7 @@ Using Bus and ID:
 
 ```bash
 virsh attach-device <vm-name>\ \
-  <(echo "<hostdev mode='subsystem' type='usb' managed='yes'>
+  <(echo "<hostdev mode='subsystem' type='usb' managed='no'>
      <source>
        <bus>1</bus>
        <device>16</device>
@@ -130,3 +130,42 @@ virsh attach-device <vm-name>\ \
 
 If we use qemu to start the vm, add this to the command:
 `-device usb-host,vendorid=0x1234,productid=0x5678` or `-device usb-host,hostbus=1,hostaddr=16`.
+
+## 06.11.2025
+
+Forwarding an unauthorized USB via GUI in _virt-manager_ worked and the USB is authorized in the VM and the drivers are
+loaded.
+
+Also, the first command with _virsh_ and the VID (VendorId) and PID (ProductId) worked!
+(did not try the second command yet)
+![img.png](logs/img.png)
+
+But we can not mount it. `lsusb` and `usb-devices` shows it, but `fdisk -l` and `lsblk` don't.  
+The USB device is trapped in a reset loop.  
+See the output of `dmesg -w`:
+
+```bash 
+[ 3219.203083] ata1: SATA link down (SStatus 0 SControl 300)
+[ 3219.522961] ata2: SATA link down (SStatus 0 SControl 300)
+[ 3219.843318] ata3: SATA link down (SStatus 0 SControl 300)
+[ 3220.163040] ata4: SATA link down (SStatus 0 SControl 300)
+[ 3220.490051] ata5: SATA link down (SStatus 0 SControl 300)
+[ 3220.810994] ata6: SATA link down (SStatus 0 SControl 300)
+[ 3254.123864] usb-storage 2-4:1.0: USB Mass Storage device detected
+[ 3254.124082] scsi host6: usb-storage 2-4:1.0
+[ 3255.370954] usb 2-4: reset SuperSpeed USB device number 7 using xhci_hcd
+[ 3255.629727] usb 2-4: reset SuperSpeed USB device number 7 using xhci_hcd
+[ 3255.885811] usb 2-4: reset SuperSpeed USB device number 7 using xhci_hcd
+[ 3256.146807] usb 2-4: reset SuperSpeed USB device number 7 using xhci_hcd
+```
+
+- [ ] find out how to mount and enumerate the USB device
+
+https://superuser.com/questions/1789488/usb-passthrough-to-vm-with-maximum-isolation-from-host  
+Another idea is to pass the whole PCI Controller to the VM.  
+![img.png](logs/img2.png)  
+But this is a deep intervention, because everything (Bluetooth, all USBs, etc.) that uses this PCI controller is passed
+to the VM and not available on the Host system, until the VM is shut down and all resouces get released back to the
+host.
+
+https://qemu-project.gitlab.io/qemu/system/devices/usb.html

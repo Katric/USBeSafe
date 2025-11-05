@@ -91,12 +91,14 @@ fn poll_usb() -> Result<(), Error> {
         };
 
         let device = event.device();
-
+        //
         let vendor = device.attribute_value("idVendor");
+        let product = device.attribute_value("idProduct");
 
+        //
         println!("{}", vendor.unwrap().to_string_lossy());
 
-        //println!("{:?}", event);
+        println!("{:?}", event);
     }
 }
 
