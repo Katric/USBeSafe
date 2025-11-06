@@ -21,10 +21,8 @@ use std::{io, ptr};
 fn poll_usb() -> Result<(), Error> {
     println!("Starting USB device monitor...");
 
-    // Create a monitor builder to set up the udev monitoring.
     let builder = udev::MonitorBuilder::new()?.match_subsystem("usb")?;
 
-    // Build the monitor, which gives us a socket to listen on.
     let monitor = builder.listen()?;
 
     println!("Listening for 'add' events on the 'usb' subsystem...");
@@ -71,8 +69,8 @@ fn poll_usb() -> Result<(), Error> {
 
 We were able to listen to events when a USB device was plugged in. We printed the events for the same device (USB stick)
 when it's
-authorized and unauthorized and compared it (see [authorized_event.txt](logs/authorized_event.txt)
-and [unauthorized_event.txt](logs/unauthorized_event.txt)).
+authorized and unauthorized and compared it (see [authorized_event.txt](etc/authorized_event.txt)
+and [unauthorized_event.txt](etc/unauthorized_event.txt)).
 
 The main difference was, that when unauthorized, the logs shows `driver = None` and when authorized, the logs shows
 `driver = Some("usb", "usb-storage", ...)`.
@@ -92,7 +90,7 @@ found [here](https://www.usb.org/defined-class-codes)
 As far as we currently know, it's not possible to classify a device without e.g. fetching and using a VID/PID mapping
 table [USB VID/PID table](http://www.linux-usb.org/usb.ids) (which most of the time does not allow for an identification
 of a devices class) (for attributes
-see [usb_mouse_unauth](logs/usb_mouse_unauth), [usb_stick_auth](logs/usb_stick_auth), [usb_stick_unauth](logs/usb_stick_unauth)).
+see [usb_mouse_unauth](etc/usb_mouse_unauth), [usb_stick_auth](etc/usb_stick_auth), [usb_stick_unauth](etc/usb_stick_unauth)).
 
 Our idea (if it's not possible to classify the unauthorized device easily on the host side) is to maybe forward the
 unauthorized USB Stick to the VM and authorize (load drivers, ...) there. This way we
@@ -138,7 +136,7 @@ loaded.
 
 Also, the first command with _virsh_ and the VID (VendorId) and PID (ProductId) worked!
 (did not try the second command yet)
-![img.png](logs/img.png)
+![img.png](etc/img.png)
 
 But we can not mount it. `lsusb` and `usb-devices` shows it, but `fdisk -l` and `lsblk` don't.  
 The USB device is trapped in a reset loop.  
@@ -163,9 +161,12 @@ See the output of `dmesg -w`:
 
 https://superuser.com/questions/1789488/usb-passthrough-to-vm-with-maximum-isolation-from-host  
 Another idea is to pass the whole PCI Controller to the VM.  
-![img.png](logs/img2.png)  
+![img.png](etc/img2.png)  
 But this is a deep intervention, because everything (Bluetooth, all USBs, etc.) that uses this PCI controller is passed
 to the VM and not available on the Host system, until the VM is shut down and all resouces get released back to the
 host.
 
 https://qemu-project.gitlab.io/qemu/system/devices/usb.html
+
+Idea: Maybe it's ok to pass the PCI Controller to the VM for BadUSB checks, check the USB for BadUSB, create an Image of
+the USB and return everything (but unauthorized) and continue with virus checks
