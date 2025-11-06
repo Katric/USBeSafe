@@ -170,3 +170,10 @@ https://qemu-project.gitlab.io/qemu/system/devices/usb.html
 
 Idea: Maybe it's ok to pass the PCI Controller to the VM for BadUSB checks, check the USB for BadUSB, create an Image of
 the USB and return everything (but unauthorized) and continue with virus checks
+
+Todos:
+
+- [ ] Configurable: Just not mount usb stick and pass it to VM (unsafe against BadUSB) VS pass PCI Controller to VM
+    - maybe send pop up where user can decide?
+    - disable automounting by default in daemon
+    - only set to unauthorized if set in config or via pop up? (default unauthorized -> authorized via popup)
