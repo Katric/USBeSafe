@@ -174,6 +174,7 @@ the USB and return everything (but unauthorized) and continue with virus checks
 Todos:
 
 - [ ] Configurable: Just not mount usb stick and pass it to VM (unsafe against BadUSB) VS pass PCI Controller to VM
+    - file level protection vs absolute maximum protection pro ultra
     - maybe send pop up where user can decide?
     - disable automounting by default in daemon
     - only set to unauthorized if set in config or via pop up? (default unauthorized -> authorized via popup)
