@@ -1,0 +1,37 @@
+@startuml
+'https://plantuml.com/activity-diagram-beta
+
+start
+#palegreen:- Computer boots -;
+:Daemon is running (on system startup);
+:Daemon reads usbesafe config file;
+if (bad_usb_protection?) then (true)
+:- All USB Devices default UNauthorized\n- Automounting disabled;
+else (false)
+:- All USB Devices default authorized\n- Automounting disabled;
+endif
+
+#palegreen:- User plugs in USB Device -;
+
+if (bad_usb_protection?) then (true)
+    :Read USB Metadata (VID, PID, UUID?);
+    :Read Whitelist File;
+    if (is whitelisted?) then (true)
+        if (is mass storage?) then (true)
+            :Pass USB Flash Drive to VM;
+        else (false)
+            stop
+        endif
+    else (false)
+        :Pass PCI USB Controller to VM;
+    endif
+else (false)
+    if (is mass storage?) then (true)
+        :Pass USB Flash Drive to VM;
+    else (false)
+        stop
+    endif
+endif
+stop
+
+@enduml
