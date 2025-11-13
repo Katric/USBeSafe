@@ -4,6 +4,7 @@ use std::os::fd::AsRawFd;
 use std::thread;
 use std::time::Duration;
 use std::{io, ptr};
+use std::process::Command;
 
 struct UsbManager;
 
@@ -50,6 +51,8 @@ impl IpcServer {
     }
 }
 
+// first run sudo apt-get install libudev-dev
+// and sudo apt install pkg-config
 fn poll_usb() -> Result<(), Error> {
     println!("Starting USB device monitor...");
 
@@ -100,6 +103,56 @@ fn poll_usb() -> Result<(), Error> {
 
         println!("{:?}", event);
     }
+}
+
+// TODO is not called during development
+/// Disables automatic mounting of removable drives for the current user by:
+/// 1. Turning off gnomes media handling automount settings via gsettings
+/// 2. Masking and stopping the per-user gvfs-udisks2-volume-monitor service which normally mounts USB devices automatically
+fn disable_automount() {
+    /*
+        TODO: In installation script mask and stop udisks2.service with root privileges
+        systemctl mask udisks2.service
+        systemctl stop udisks2.service 
+     */
+    
+    /*
+        To undo:
+        gsettings set org.gnome.desktop.media-handling automount true
+        gsettings set org.gnome.desktop.media-handling automount-open true
+        systemctl --user unmask gvfs-udisks2-volume-monitor.service
+        systemctl --user start gvfs-udisks2-volume-monitor.service
+     */
+    
+    Command::new("gsettings")
+        .arg("set")
+        .arg("org.gnome.desktop.media-handling")
+        .arg("automount")
+        .arg("false")
+        .output()
+        .expect("Could not set automount to false in gsettings");
+
+    Command::new("gsettings")
+        .arg("set")
+        .arg("org.gnome.desktop.media-handling")
+        .arg("automount-open")
+        .arg("false")
+        .output()
+        .expect("Could not set automount-open to false in gsettings");
+    
+    Command::new("systemctl")
+        .arg("--user")
+        .arg("mask")
+        .arg("gvfs-udisks2-volume-monitor.service")
+        .output()
+        .expect("Coudl not mask users gvfs-udisks2-volume-monitor.service");
+    
+    Command::new("systemctl")
+        .arg("--user")
+        .arg("stop")
+        .arg("gvfs-udisks2-volume-monitor.service")
+        .output()
+        .expect("Could not stop users gvfs-udisks2-volume-monitor.service");
 }
 
 fn main() {
