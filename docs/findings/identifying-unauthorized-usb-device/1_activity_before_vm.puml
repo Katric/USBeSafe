@@ -6,14 +6,14 @@ start
 :Daemon is running (on system startup);
 :Daemon reads usbesafe config file;
 if (bad_usb_protection?) then (true)
-:- All USB Devices default UNauthorized\n- Automounting disabled;
+:- All USB Devices default UNauthorized\n (Driver will not be loaded)\n- Automounting disabled;
 else (false)
-:- All USB Devices default authorized\n- Automounting disabled;
+:- All USB Devices default authorized\n (Driver gets loaded)\n- Automounting disabled;
 endif
 
 #palegreen:- User plugs in USB Device -;
 
-:Pop-Up opens that USB Device was recognized and will be scanned;
+:Pop-Up dialog opens that USB Device was recognized and will be checked for malicious behaviour\n(Optional: Maybe with 20 seconds timer to cancel scan?);
 
 if (bad_usb_protection?) then (true)
     :Read USB Metadata (VID, PID, UUID?);
@@ -22,6 +22,7 @@ if (bad_usb_protection?) then (true)
         if (is mass storage?) then (true)
             :Pass USB Flash Drive to VM;
         else (false)
+            :USB Device gets authorized;
             stop
         endif
     else (false)
@@ -29,7 +30,7 @@ if (bad_usb_protection?) then (true)
         if (Ask User: Hardware passthrough to VM?) then (true)
 
         else (false)
-            :Device stays unauthorized;
+            :USB Device stays unauthorized;
             stop
         endif
         :Pass PCI USB Controller to VM;
@@ -38,11 +39,12 @@ else (false)
     if (is mass storage?) then (true)
         :Pass USB Flash Drive to VM;
     else (false)
+        :USB Device gets authorized;
         stop
     endif
 endif
 
-:Show Pop-Up with status (e.g. Progress-Bar));
+:Show Pop-Up with status (e.g. Progress-Bar);
 stop
 
 @enduml
