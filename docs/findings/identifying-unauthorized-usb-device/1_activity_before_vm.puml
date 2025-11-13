@@ -13,6 +13,8 @@ endif
 
 #palegreen:- User plugs in USB Device -;
 
+:Pop-Up opens that USB Device was recognized and will be scanned;
+
 if (bad_usb_protection?) then (true)
     :Read USB Metadata (VID, PID, UUID?);
     :Read Whitelist File;
@@ -23,6 +25,13 @@ if (bad_usb_protection?) then (true)
             stop
         endif
     else (false)
+        :- Pop-Up shows that the USB devices is not whitelisted\n- USB Device needs to be scanned\n- The whole PC will be unavailable during this time;
+        if (Ask User: Hardware passthrough to VM?) then (true)
+
+        else (false)
+            :Device stays unauthorized;
+            stop
+        endif
         :Pass PCI USB Controller to VM;
     endif
 else (false)
@@ -32,6 +41,8 @@ else (false)
         stop
     endif
 endif
+
+:Show Pop-Up with status (e.g. Progress-Bar));
 stop
 
 @enduml
