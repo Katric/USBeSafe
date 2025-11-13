@@ -1,0 +1,50 @@
+@startuml
+'https://plantuml.com/activity-diagram-beta
+
+start
+#palegreen:- Computer boots -;
+:Daemon is running (on system startup);
+:Daemon reads usbesafe config file;
+if (bad_usb_protection?) then (true)
+:- All USB Devices default UNauthorized\n (Driver will not be loaded)\n- Automounting disabled;
+else (false)
+:- All USB Devices default authorized\n (Driver gets loaded)\n- Automounting disabled;
+endif
+
+#palegreen:- User plugs in USB Device -;
+
+:Pop-Up dialog opens that USB Device was recognized and will be checked for malicious behaviour\n(Optional: Maybe with 20 seconds timer to cancel scan?);
+
+if (bad_usb_protection?) then (true)
+    :Read USB Metadata (VID, PID, UUID?);
+    :Read Whitelist File;
+    if (is whitelisted?) then (true)
+        if (is mass storage?) then (true)
+            :Pass USB Flash Drive to VM;
+        else (false)
+            :USB Device gets authorized;
+            stop
+        endif
+    else (false)
+        :- Pop-Up shows that the USB devices is not whitelisted\n- USB Device needs to be scanned\n- The whole PC will be unavailable during this time;
+        if (Ask User: Hardware passthrough to VM?) then (true)
+
+        else (false)
+            :USB Device stays unauthorized;
+            stop
+        endif
+        :Pass PCI USB Controller to VM;
+    endif
+else (false)
+    if (is mass storage?) then (true)
+        :Pass USB Flash Drive to VM;
+    else (false)
+        :USB Device gets authorized;
+        stop
+    endif
+endif
+
+:Show Pop-Up with status (e.g. Progress-Bar);
+stop
+
+@enduml
