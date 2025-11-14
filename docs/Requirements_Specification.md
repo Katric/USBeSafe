@@ -13,6 +13,76 @@
 
 ### USBeSafe Workflow
 
+1. `usbesafed` is started by systemd on boot
+2. `usbesafed` will now block automounting and enumerating USB devices. Depending on the config, all devices are unauthorized/authorized
+2. `usbesafed` creates a virtual USB device and launches a fresh VM
+3. User plugs in a device
+4. `usbesafed` intercepts the device and identifies that it actually is a USB device
+5. After examination, `usbesafed` passes the USB device to `usbesafed-vm` inside the VM
+6. `usbesafed-vm` mounts the USB device
+7. `usbesafed-vm` autmatically scans all files on the devices
+8. `usbesafed-vm` sends a boolean to `usbesafed` wheather all files are safe (true) or one or more are bad (false) and a short description which files are bad
+9.  If true: `usbesafed` mounts the virtual usb stick to the guest vm and make it visible for the host system restarts the VM
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant systemd
+    participant PhysicalUSB as Physical USB Device
+    participant CLI
+    participant usbesafed as usbesafed (Host Daemon)
+    participant vUSB as Virtual USB Device
+    participant VM
+    participant usbesafed-vm as usbesafed-vm (Guest Daemon)
+    participant Scanner
+
+    User ->>systemd: Boot host system
+    systemd ->> usbesafed: Start daemon
+    usbesafed->>usbesafed: Block automounting & enumeration
+    usbesafed->>usbesafed: depending on config all USB-devices are authorized/unauthorized
+    usbesafed->>vUSB: Create virtual USB device
+    usbesafed->>VM: Launch fresh VM
+    VM->>VM: Boot VM
+    VM->>usbesafed-vm: Start Daemon
+    usbesafed-vm->>Scanner: Initalize Scanner
+    Scanner->>usbesafed-vm: complete
+    usbesafed-vm->>VM: complete
+    VM->>usbesafed: Startup complete
+    usbesafed->>User: Ready - plug in USB device
+    
+    User->>PhysicalUSB: Insert USB device
+    PhysicalUSB->>usbesafed: Device detected
+    usbesafed->>User: Pop-Up: "Device detected! Scan will be started soon"
+    usbesafed->>usbesafed: Intercept & identify device type
+    usbesafed->>usbesafed-vm: Pass USB device to VM
+    usbesafed-vm->>PhysicalUSB: Mount USB device
+    
+    usbesafed-vm->>Scanner: Execute scan on all files
+    Scanner->>usbesafed-vm: Return scan results
+    usbesafed-vm->>usbesafed: Send scan results
+        
+    alt One or more files are malicious (red)
+        usbesafed->>VM: kill VM
+        VM->>VM: kill
+        VM->>usbesafed: killed
+        usbesafed->>User: Pop-Up: "Malicous Files on ur USB-Device"
+    else All files are safe (green)
+        usbesafed->>vUSB: Mount to VM
+        vUSB->>VM: Mount
+        VM->>usbesafed-vm: Virtual USB is visible
+        usbesafed-vm->>vUSB: Transfer files
+        usbesafed->>User: Make virtual USB visible (mount)
+        User->>vUSB: Acess Files on virtual USB
+    end
+    User->>CLI: End session
+    CLI->>usbesafed: Terminate session
+    usbesafed->>VM: Destroy VM
+    usbesafed->>vUSB: Clean up virtual USB
+```
+
+
+### USBeSafe Workflow with File selection
+
 1. User activates `usbesafed` via the CLI
 2. `usbesafed` will now block automounting and enumerating USB devices
 2. `usbesafed` creates a virtual USB device and launches a fresh VM
