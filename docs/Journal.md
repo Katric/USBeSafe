@@ -23,9 +23,9 @@ gantt
     Research on work packages (individual)                  :2025-10-23, 10d
 
     section Implementation
-    Implementation of modules / sub-packages                :2025-11-02, 21d
-    Integration & internal testing                          :2025-11-23, 10d
-    First working MVP                                       :milestone1, 2025-11-30, 1d
+    Implementation of modules / sub-packages                :2025-11-02, 28d
+    Integration & internal testing                          :2025-11-30, 10d
+    First working MVP                                       :milestone1, 2025-12-09, 1d
 
     section Presentation 1
     Preparation for mid-term presentation                   :2025-11-30, 5d
