@@ -1,7 +1,17 @@
+import subprocess
 import time
 
 import pyudev
 from pyudev import Context, Monitor
+
+"""
+Listens to ADD udev events and reads the following properties:
+- VID
+- PID
+- Serial Number (if present)
+- Path
+- Is mass storage device
+"""
 
 
 def handle_add_usb():
@@ -56,6 +66,33 @@ def handle_add_usb():
 
             # TODO: If is mass storage, start VM and attach the device via VID and PID
             # TODO: Add to whitelist if unknown...
+
+
+"""
+Masks and stops udisks2.service to disable auto-mount.
+"""
+
+
+def disable_udisks2_service():
+    # TODO: is not called yet to prevent system modification during developemnt
+    # 1. systemctl mask udisks2.service
+    mask_command = ["systemctl", "mask", "udisks2.service"]
+    try:
+        subprocess.run(mask_command, check=True, capture_output=True, text=True)
+        print("✅ udisks2 successfully masked.")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Error when trying to mask udisks2. Code {e.returncode}: {e.stderr.strip()}")
+        return False
+
+    # 2. systemctl stop udisks2.service
+    stop_command = ["systemctl", "stop", "udisks2.service"]
+    try:
+        subprocess.run(stop_command, check=True, capture_output=True, text=True)
+        print("✅ udisks2 sucessfully stopped.")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Error when trying to stop udisks2. Code {e.returncode}: {e.stderr.strip()}")
+        return False
 
 
 def main():
