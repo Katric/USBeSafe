@@ -94,8 +94,8 @@ def handle_add_usb():
         if device is not None and device.action == 'add':
             print('{} connected'.format(device))
 
-            for key, value in device.items():
-                print(f"  {key:<20}: {value}")
+            # for key, value in device.items():
+            #    print(f"  {key:<20}: {value}")
 
             # We only listen to the ADD Event of the parent type
             if device.get('DEVTYPE') != 'usb_device':
