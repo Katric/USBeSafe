@@ -16,6 +16,7 @@ sudo python3 usbesafed.py
 ```
 
 The daemon will:
+
 1. Check for required system tools
 2. Download Alpine virt ISO (first run only)
 3. Create base qcow2 image (first run only)
@@ -46,9 +47,18 @@ Or with Python:
 
 ```python
 import socket
+
 sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 sock.connect("/tmp/usbesafe.sock")
 sock.sendall(b"SCAN_USB_DEVICE\n")
 print(sock.recv(256).decode())
 sock.close()
+```
+
+Start program with sudo: (from )
+First download Alpine x86_64 image and put it in THIS directory (TODO: move to images dir)
+https://alpinelinux.org/downloads/
+
+```bash
+sudo .venv/bin/python components/host/usbesafed/src/usbesafed.py 
 ```

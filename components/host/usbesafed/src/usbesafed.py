@@ -12,7 +12,7 @@ from popup import show_scan_popup, StatusWindow
 
 SCRIPT_FILE_PATH = os.path.abspath(__file__)
 SCRIPT_DIR = os.path.dirname(SCRIPT_FILE_PATH)
-BASE_IMAGE_REL_TO_SCRIPT = os.path.join('..', '..', '..', '..', 'images', 'alpine-base.qcow2')
+BASE_IMAGE_REL_TO_SCRIPT = os.path.join('..', '..', '..', '..', 'images', 'alpine.qcow2')
 
 # ---- CONFIG ----
 VM_NAME_PREFIX = "alpine-usb-"
@@ -23,98 +23,50 @@ QCOW2_BASE_IMAGE = os.path.join(VM_DISK_DIR, "alpine-base.qcow2")
 VM_RAM = 1024
 VM_VCPUS = 1
 VM_BRIDGE = "virbr0"
+IMAGES_PATH_RELATIVE = "../../../../images/"
 
 
-
-def create_vm_disk(vm_id):
-    """
-    Creates Copy-on-Write QCOW2 image, cloned from base img
-    """
-    if not os.path.exists(QCOW2_BASE_IMAGE):
-        print(f"❌ Error: Could not find base img under {QCOW2_BASE_IMAGE}")
-        return None
-
-    vm_disk_path = os.path.join(VM_DISK_DIR, f"{VM_NAME_PREFIX}{vm_id}-disk.qcow2")
+def start_vm(vid, pid, drive_name):
+    print(f"[+] VM is starting (Drive name: {drive_name})")
+    try:
+        # TODO move images to images directory and change paths
+        subprocess.Popen([
+            "qemu-img", "create",
+            "-f", "qcow2", f"{drive_name}.qcow2", "8G"
+        ], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except Exception as e:
+        raise Exception(f"Failed to spawn QEMU: {e}")
 
     try:
-        print(f"➡️ Clone base img for VM: {vm_disk_path}")
-        subprocess.run(
-            [
-                "qemu-img",
-                "create",
-                "-f", "qcow2",
-                "-o", f"backing_file={QCOW2_BASE_IMAGE},backing_fmt=qcow2",
-                vm_disk_path
-            ],
-            check=True
-        )
-        return vm_disk_path
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Error creating QCOW2 overlay: {e}")
-        return None
+        vm_process = subprocess.Popen([
+            # "-nic", "none",
+            # "-drive", f"file={image_path},format=qcow2,if=virtio",
+            # "-device", "virtio-serial-pci",
+            # "-chardev", "socket,path=/tmp/usbesafe.sock,server,nowait,id=ch0",
+            # "-device", "virtserialport,chardev=ch0,name=com.usbesafe.scan",
+            # "-cpu", "host,-hypervisor",
+            # "-machine", "pc,suppress-vmdesc=on",
+            # "-nodefaults",
+            # "-qmp", "none",
+            "qemu-system-x86_64",
+            "-m", "512",
+            "-smp", "cores=1",
+            "-nic", "user",
+            "-boot", "once=d",
+            "-cdrom", f"alpine-standard-3.22.2-x86_64.iso",
+            "-drive", f"file={drive_name}.qcow2",
+            "-display", "gtk",
+            "-enable-kvm",
+            "-device", "qemu-xhci,id=xhci",
+            "-nographic",
+            "-device", f"driver=usb-host,bus=xhci.0,vendorid=0x{vid},productid=0x{pid}"
 
-
-def build_vm_xml(vm_name, vm_disk_path, usb_vendor_id, usb_product_id):
-    """
-    Generates VM config with USB-Passthrough.
-    """
-    # Check if KVM is available, otherwise fall back to QEMU emulation
-    virt_type = 'kvm' if os.path.exists('/dev/kvm') else 'qemu'
-    
-    # Destroyed on poweroff
-    xml = f"""
-        <domain type='{virt_type}'>
-          <name>{vm_name}</name>
-          <memory unit='MiB'>{VM_RAM}</memory>
-          <vcpu placement='static'>{VM_VCPUS}</vcpu>
-          <os>
-            <type arch='x86_64' machine='pc-q35-8.1'>hvm</type>
-          </os>
-          <features>
-            <acpi/>
-          </features>
-          <on_poweroff>destroy</on_poweroff>
-          <on_crash>destroy</on_crash>
-          <devices>
-            <disk type='file' device='disk'>
-              <driver name='qemu' type='qcow2'/>
-              <source file='{vm_disk_path}'/>
-              <target dev='vda' bus='virtio'/>
-            </disk>
-            <interface type='bridge'>
-              <source bridge='{VM_BRIDGE}'/>
-              <model type='virtio'/>
-            </interface>
-            <graphics type='spice' autoport='yes'/>
-            <controller type='usb' model='qemu-xhci'/>
-        
-            <hostdev mode='subsystem' type='usb'>
-              <source>
-                <vendor id='0x{usb_vendor_id}'/>
-                <product id='0x{usb_product_id}'/>
-              </source>
-            </hostdev>
-        
-          </devices>
-        </domain>
-    """
-    return xml.strip()
-
-
-def start_transient_vm(vm_name, vm_xml):
-    """Starts a transient VM using virsh create."""
-    try:
-        print(f"🔥 Starting transient VM: **{vm_name}**...")
-        subprocess.run(
-            ["virsh", "create", "/dev/stdin"],
-            input=vm_xml.encode('utf-8'),
-            check=True
-        )
-        print(f"✅ VM '{vm_name}' started. USB device passed over to VM.")
+        ], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        print(f"[+] VM started (PID: {vm_process.pid})")
+        time.sleep(2)
         return True
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Error starting the VM: '{vm_name}' with virsh: {e}")
-        return False
+    except Exception as e:
+        raise Exception(f"Failed to spawn QEMU: {e}")
 
 
 def handle_add_usb():
@@ -142,8 +94,8 @@ def handle_add_usb():
         if device is not None and device.action == 'add':
             print('{} connected'.format(device))
 
-            # for key, value in device.items():
-            #    print(f"  {key:<20}: {value}")
+            for key, value in device.items():
+                print(f"  {key:<20}: {value}")
 
             # We only listen to the ADD Event of the parent type
             if device.get('DEVTYPE') != 'usb_device':
@@ -158,7 +110,7 @@ def handle_add_usb():
 
             # wait to process all kernel actions
             # TODO try shorter time
-            time.sleep(5)
+            time.sleep(2)
 
             is_mass_storage = False
 
@@ -184,33 +136,25 @@ def handle_add_usb():
                     'pid': pid,
                     'serial': serial
                 }
-                
+
                 if not show_scan_popup(device_info):
                     print("🚫 Scan cancelled by user")
                     continue
-                
+
                 # Create status window to show scan progress
                 status_window = StatusWindow(device_info)
                 status_window.start()
-                
+
                 try:
                     vm_id = os.urandom(4).hex()
                     vm_name = f"{VM_NAME_PREFIX}{vm_id}"
 
-                    status_window.update("Creating VM disk image...")
-                    vm_disk_path = create_vm_disk(vm_id)
-                    if not vm_disk_path:
-                        status_window.update("Error: Could not create QCOW2 image")
-                        time.sleep(3)
-                        status_window.close()
-                        print("Error: Could not create QCOW2 image")
-                        return
-
                     status_window.update("Building VM configuration...")
-                    vm_xml = build_vm_xml(vm_name, vm_disk_path, vid, pid)
+
+                    is_vm_started = start_vm(vid, pid, vm_name)
 
                     status_window.update("Starting VM and attaching USB device...")
-                    if start_transient_vm(vm_name, vm_xml):
+                    if is_vm_started:
                         status_window.update("VM started successfully - Scanning USB device...")
                         print("VM started and USB passed")
                         # Keep status window open while VM is running
@@ -290,11 +234,11 @@ def ensure_base_image():
     if os.path.exists(QCOW2_BASE_IMAGE):
         print(f"✅ Base image already present: {QCOW2_BASE_IMAGE}")
         return True
-    
+
     if not os.path.exists(QCOW2_BASE_IMAGE_SOURCE):
         print(f"❌ Error: Base image not found at {QCOW2_BASE_IMAGE_SOURCE}")
         return False
-    
+
     try:
         print(f"📋 Copying base image to libvirt directory...")
         print(f"   From: {QCOW2_BASE_IMAGE_SOURCE}")
@@ -310,7 +254,7 @@ def ensure_base_image():
 
 def main():
     print("╔════════════════════════════════════════════╗")
-    print("║   USBeSafe Daemon - Secure USB Scanning   ║")
+    print("║   USBeSafe Daemon - Secure USB Scanning    ║")
     print("╚════════════════════════════════════════════╝\n")
 
     # Check dependencies
@@ -318,8 +262,8 @@ def main():
         return
 
     # Ensure base image is accessible to libvirt
-    if not ensure_base_image():
-        return
+    # if not ensure_base_image():
+    #    return
 
     disable_udisks2_service()  # disable and mask udisks2 to disable automount
     handle_add_usb()  # Listener listening for udev ADD events and starting VMs
