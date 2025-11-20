@@ -62,3 +62,13 @@ https://alpinelinux.org/downloads/
 ```bash
 sudo .venv/bin/python components/host/usbesafed/src/usbesafed.py 
 ```
+
+## The configuration file against BadUSB Protection
+
+The daemon reads a configuration file containing the 'BAD_USB_PROTECTION' flag. This value (0 or 1) decides if the
+BadUSB Protection should be used or not.  
+You can create the file and its contents directly by running the following command:
+
+```bash
+  sudo mkdir -p /etc/usbesafe/ && echo "BAD_USB_PROTECTION = 1" | sudo tee /etc/usbesafe/usbesafe.conf
+```
