@@ -16,6 +16,7 @@ sudo python3 usbesafed.py
 ```
 
 The daemon will:
+
 1. Check for required system tools
 2. Download Alpine virt ISO (first run only)
 3. Create base qcow2 image (first run only)
@@ -46,9 +47,28 @@ Or with Python:
 
 ```python
 import socket
+
 sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 sock.connect("/tmp/usbesafe.sock")
 sock.sendall(b"SCAN_USB_DEVICE\n")
 print(sock.recv(256).decode())
 sock.close()
+```
+
+Start program with sudo: (from )
+First download Alpine x86_64 image and put it in THIS directory (TODO: move to images dir)
+https://alpinelinux.org/downloads/
+
+```bash
+sudo .venv/bin/python components/host/usbesafed/src/usbesafed.py 
+```
+
+## The configuration file against BadUSB Protection
+
+The daemon reads a configuration file containing the 'BAD_USB_PROTECTION' flag. This value (0 or 1) decides if the
+BadUSB Protection should be used or not.  
+You can create the file and its contents directly by running the following command:
+
+```bash
+  sudo mkdir -p /etc/usbesafe/ && echo "BAD_USB_PROTECTION = 1" | sudo tee /etc/usbesafe/usbesafe.conf
 ```
