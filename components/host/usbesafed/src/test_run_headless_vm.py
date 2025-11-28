@@ -18,8 +18,12 @@ BASE_IMAGE_REL_TO_SCRIPT = os.path.join('..', '..', '..', '..', 'images', 'alpin
 # ---------------- CONFIG ----------------
 VM_NAME_PREFIX = "alpine-usb-"
 
-QCOW2_BASE_IMAGE_SOURCE = os.path.normpath(os.path.join(SCRIPT_DIR, BASE_IMAGE_REL_TO_SCRIPT))
-OVERLAY_IMAGE = QCOW2_BASE_IMAGE_SOURCE.replace("alpine-base.qcow2", "overlay.qcow2")
+# Base image location (always correct regardless of where script is run)
+SCRIPT_DIR = Path(__file__).resolve().parent
+BASE_IMAGE = (SCRIPT_DIR / ".." / ".." / ".." / ".." / "images" / "alpine-base.qcow2").resolve()
+
+# Overlay lives in the same directory as the base image
+OVERLAY_IMAGE = BASE_IMAGE.parent / "overlay.qcow2"
 
 QMP_SOCKET = "/tmp/securepass_qmp.sock"
 VIRTIO_SOCKET = "/tmp/securepass_virtio.sock"
@@ -38,9 +42,11 @@ def create_overlay():
     subprocess.run([
         "qemu-img", "create",
         "-f", "qcow2",
-        "-b", QCOW2_BASE_IMAGE_SOURCE,
-        OVERLAY_IMAGE
+        "-F", "qcow2",              # <--- tell QEMU the base format
+        "-b", str(BASE_IMAGE),
+        str(OVERLAY_IMAGE)
     ], check=True)
+
 
     print("[INFO] Overlay created:", OVERLAY_IMAGE)
 
@@ -151,6 +157,67 @@ def cleanup_overlay():
 
 
 # ============================================================
+#                      Dependencies Checker
+# ============================================================
+
+def check_system_deps():
+    """Check for required system tools"""
+    missing = []
+    tools = {
+        "qemu-system-x86_64": "qemu-system-x86",
+        "qemu-img": "qemu-utils",
+        "wget": "wget",
+        "virsh": "virsh",
+        "yad": "yad"
+    }
+
+    for tool, package in tools.items():
+        if shutil.which(tool) is None:
+            missing.append(package)
+
+    if missing:
+        print("USBeSafe startup check:\n")
+        print(f"Missing system packages detected: {missing}\n")
+        print("To install on Debian/Ubuntu, run:")
+        print("  sudo apt-get update")
+        print("  sudo apt-get install -y qemu-system-x86 qemu-utils libvirt-clients qemu-kvm wget curl yad\n")
+        print("Then re-run the daemon.\n")
+        return False
+
+    return True
+
+
+# ============================================================
+#                      Disable Auto-Mount
+# ============================================================
+
+def disable_udisks2_service():
+    """
+    Masks and stops udisks2.service to disable auto-mount.
+    """
+
+    return  # todo remove return after development is finished to disable udisks2
+    # 1. systemctl mask udisks2.service
+    mask_command = ["systemctl", "mask", "udisks2.service"]
+    try:
+        subprocess.run(mask_command, check=True, capture_output=True, text=True)
+        print("✅ udisks2 successfully masked.")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Error when trying to mask udisks2. Code {e.returncode}: {e.stderr.strip()}")
+        return False
+
+    # 2. systemctl stop udisks2.service
+    stop_command = ["systemctl", "stop", "udisks2.service"]
+    try:
+        subprocess.run(stop_command, check=True, capture_output=True, text=True)
+        print("✅ udisks2 sucessfully stopped.")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Error when trying to stop udisks2. Code {e.returncode}: {e.stderr.strip()}")
+        return False
+
+
+# ============================================================
 #                       USB LOGIC
 # ============================================================
 
@@ -172,13 +239,13 @@ def run_prod_scan(vid, pid, vm_name, status_window):
     result = wait_for_virtio()
 
     if result == "fail":
-        status_window.update("Scan FAILED – malware detected!")
+        status_window.update("Scan FAILED, malware detected!")
         kill_vm(vm)
         cleanup_overlay()
         return
 
     if result == "ok":
-        status_window.update("Scan clean – waiting for copy…")
+        status_window.update("Scan clean, waiting for copy…")
 
         # ---------------- WAIT FOR "copy_done" ----------------
         msg = wait_for_virtio()
@@ -199,49 +266,107 @@ def run_prod_scan(vid, pid, vm_name, status_window):
 # ============================================================
 
 def handle_add_usb():
+    """
+    Listens to ADD udev events and reads the following properties:
+    - VID
+    - PID
+    - Serial Number (if present)
+    - Path
+    - Is mass storage device
+
+    Starts VM and attaches a connected USB device (if it is mass storage) to the started VM
+    """
     context: Context = pyudev.Context()
     monitor: Monitor = pyudev.Monitor.from_netlink(context)
     monitor.filter_by(subsystem='usb')
 
     print("=" * 60)
-    print("Waiting for new USB Devices… (ADD)")
+    print("Waiting for new USB Devices... (Event type ADD)")
     print("=" * 60)
 
     for device in iter(monitor.poll, None):
+        device: pyudev.Device = device
 
-        if device.action != "add":
-            continue
-        if device.get('DEVTYPE') != 'usb_device':
-            continue
+        if device is not None and device.action == 'add':
+            print('{} connected'.format(device))
 
-        vid = device.get('ID_VENDOR_ID')
-        pid = device.get('ID_MODEL_ID')
-        serial = device.get('ID_SERIAL_SHORT', None)
+            # for key, value in device.items():
+            #    print(f"  {key:<20}: {value}")
 
-        time.sleep(2)
+            # We only listen to the ADD Event of the parent type
+            if device.get('DEVTYPE') != 'usb_device':
+                print("Device type is {}. Skipping.".format(device.get('DEVTYPE')))
+                continue
 
-        is_mass_storage = any(
-            c.get('DEVTYPE') == "usb_interface" and c.get('DRIVER') == "usb-storage"
-            for c in device.children
-        )
+            # VID, PID and seriel num (for whitelist later)
+            vid = device.get('ID_VENDOR_ID')  # VID and PID is mandatory for our tool
+            pid = device.get('ID_MODEL_ID')
+            # TODO not every device has a unique serial number. Maybe VID/PID is enough for bad usb whitelist?
+            serial = device.get('ID_SERIAL_SHORT', None)
 
-        if not is_mass_storage:
-            continue
+            # wait to process all kernel actions
+            # TODO try shorter time
+            time.sleep(2)
 
-        device_info = {"vid": vid, "pid": pid, "serial": serial}
+            is_mass_storage = False
 
-        # ---------------- popup you already implemented ----------------
-        if not show_scan_popup(device_info):
-            continue
+            # check if device is mass-storge devicce
+            for child in device.children:
+                if child.get('DEVTYPE') == 'usb_interface' and child.get('DRIVER') == 'usb-storage':
+                    is_mass_storage = True
+                    break
 
-        status = StatusWindow(device_info)
-        status.start()
-        status.update("Preparing VM…")
+            print("\n✅ New USB Device detected!")
+            print("-" * 40)
+            print(f"  VID               : {vid}")
+            print(f"  PID               : {pid}")
+            print(f"  Serial Number     : {serial}")
+            print(f"  Path              : {device.device_path}")
+            print(f"  Is mass storage   : {is_mass_storage}")
+            print("-" * 40)
 
-        vm_id = os.urandom(4).hex()
-        vm_name = f"{VM_NAME_PREFIX}{vm_id}"
+            if is_mass_storage:
+                # Show popup and ask user if device should be scanned
+                device_info = {
+                    'vid': vid,
+                    'pid': pid,
+                    'serial': serial
+                }
 
-        run_prod_scan(vid, pid, vm_name, status)
+                if not show_scan_popup(device_info):
+                    print("🚫 Scan cancelled by user")
+                    continue
+
+                # Create status window to show scan progress
+                status_window = StatusWindow(device_info)
+                status_window.start()
+
+                try:
+                    vm_id = os.urandom(4).hex()
+                    vm_name = f"{VM_NAME_PREFIX}{vm_id}"
+
+                    status_window.update("Building VM configuration...")
+
+                    is_vm_started = start_vm(vid, pid, vm_name)
+
+                    status_window.update("Starting VM and attaching USB device...")
+                    if is_vm_started:
+                        status_window.update("VM started successfully - Scanning USB device...")
+                        print("VM started and USB passed")
+                        # Keep status window open while VM is running
+                        time.sleep(5)  # Show success message briefly
+                        status_window.update("Scan in progress - VM is running...")
+                        # TODO: Monitor VM status and update accordingly
+                        # TODO temporary QCOW file has to be deleted manually after shutdown under vm_disk_path
+                    else:
+                        status_window.update("Error: Failed to start VM")
+                        time.sleep(3)
+                        status_window.close()
+                except Exception as e:
+                    status_window.update(f"Error: {str(e)}")
+                    time.sleep(3)
+                    status_window.close()
+                    raise
 
 
 # ============================================================
@@ -251,6 +376,12 @@ def handle_add_usb():
 def main():
     print("=== USBeSafe Daemon – Production Mode ===")
 
+    # Check dependencies
+    if not check_system_deps():
+        return
+
+
+    disable_udisks2_service()  # disable and mask udisks2 to disable automount
     handle_add_usb()
 
 
