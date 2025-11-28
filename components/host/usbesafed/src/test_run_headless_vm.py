@@ -30,133 +30,6 @@ VIRTIO_SOCKET = "/tmp/securepass_virtio.sock"
 
 
 # ============================================================
-#                     OVERLAY CREATION
-# ============================================================
-
-def create_overlay():
-    print("[INFO] Creating overlay…")
-
-    if os.path.exists(OVERLAY_IMAGE):
-        os.remove(OVERLAY_IMAGE)
-
-    subprocess.run([
-        "qemu-img", "create",
-        "-f", "qcow2",
-        "-F", "qcow2",              # <--- tell QEMU the base format
-        "-b", str(BASE_IMAGE),
-        str(OVERLAY_IMAGE)
-    ], check=True)
-
-
-    print("[INFO] Overlay created:", OVERLAY_IMAGE)
-
-
-# ============================================================
-#                     QEMU START
-# ============================================================
-
-def start_vm(vid, pid, drive_name):
-    """
-    PRODUCTION VM:
-    - headless
-    - overlay as root disk
-    - virtio-serial port for communication
-    - QMP for control
-    - pass through the real USB stick
-    """
-
-    print(f"[INFO] Starting scanning VM for drive '{drive_name}'")
-
-    # Remove old sockets
-    for s in (QMP_SOCKET, VIRTIO_SOCKET):
-        if os.path.exists(s):
-            os.remove(s)
-
-    qemu_cmd = [
-        "qemu-system-x86_64",
-        "-enable-kvm",
-        "-m", "1024",
-        "-smp", "2",
-
-        "-drive", f"file={OVERLAY_IMAGE},format=qcow2",
-
-        "-nographic",
-
-        # --- Virtio communication channel ---
-        "-chardev", f"socket,id=virtiocomm,path={VIRTIO_SOCKET},server,nowait",
-        "-device", "virtio-serial-pci",
-        "-device", "virtserialport,chardev=virtiocomm,name=com.securepass.comm",
-
-        # --- QMP channel ---
-        "-qmp", f"unix:{QMP_SOCKET},server,nowait",
-
-        # --- USB passthrough (real hardware) ---
-        "-device", "qemu-xhci,id=xhci",
-        f"-device=usb-host,bus=xhci.0,vendorid=0x{vid},productid=0x{pid}",
-    ]
-
-    print("[INFO] Launching QEMU:")
-    print(" ".join(qemu_cmd))
-
-    vm_process = subprocess.Popen(qemu_cmd)
-    time.sleep(1)
-    return vm_process
-
-
-# ============================================================
-#                     VIRTIO MESSAGE RECV
-# ============================================================
-
-def wait_for_virtio():
-    print("[INFO] Waiting for VM daemon messages…")
-
-    # Wait for virtio socket
-    while not os.path.exists(VIRTIO_SOCKET):
-        time.sleep(0.2)
-
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
-        s.connect(VIRTIO_SOCKET)
-
-        while True:
-            data = s.recv(1024).decode().strip()
-            if data:
-                print(f"[VM → HOST] {data}")
-                return data
-
-
-# ============================================================
-#                      QMP CONTROL
-# ============================================================
-
-def qmp_send(cmd):
-    try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
-            s.connect(QMP_SOCKET)
-            time.sleep(0.2)
-            s.recv(4096)  # QMP greeting
-            s.send((cmd + "\n").encode())
-            return s.recv(4096).decode()
-    except:
-        return None
-
-
-def kill_vm(vm):
-    print("[INFO] Stopping VM…")
-    try:
-        qmp_send('{ "execute": "system_powerdown" }')
-        vm.wait(timeout=5)
-    except:
-        print("[WARN] Hard kill")
-        vm.kill()
-
-
-def cleanup_overlay():
-    if os.path.exists(OVERLAY_IMAGE):
-        print("[INFO] Removing overlay:", OVERLAY_IMAGE)
-        os.remove(OVERLAY_IMAGE)
-
-
-# ============================================================
 #                      Dependencies Checker
 # ============================================================
 
@@ -218,6 +91,239 @@ def disable_udisks2_service():
 
 
 # ============================================================
+#                     OVERLAY CREATION
+# ============================================================
+
+def create_overlay():
+    print("[INFO] Creating overlay…")
+
+    if os.path.exists(OVERLAY_IMAGE):
+        os.remove(OVERLAY_IMAGE)
+
+    subprocess.run([
+        "qemu-img", "create",
+        "-f", "qcow2",
+        "-F", "qcow2",              # <--- tell QEMU the base format
+        "-b", str(BASE_IMAGE),
+        str(OVERLAY_IMAGE)
+    ], check=True)
+
+
+    print("[INFO] Overlay created:", OVERLAY_IMAGE)
+
+
+# ============================================================
+#                     QEMU START
+# ============================================================
+
+def start_vm(vid, pid, drive_name):
+    """
+    PRODUCTION VM:
+    - headless
+    - overlay as root disk
+    - virtio-serial port for communication
+    - QMP for control
+    - pass through the real USB stick
+    """
+
+    print(f"[INFO] Starting scanning VM for drive '{drive_name}'")
+
+    # Remove old sockets
+    for s in (QMP_SOCKET, VIRTIO_SOCKET):
+        if os.path.exists(s):
+            os.remove(s)
+    try:
+        qemu_cmd = [
+            "qemu-system-x86_64",
+            "-enable-kvm",
+            "-m", "1024",
+            "-smp", "2",
+
+            "-drive", f"file={OVERLAY_IMAGE},format=qcow2",
+
+            "-nographic",
+            
+            #QEMU won’t bind to your TTY. good for debugging /remove to get access to VM
+            #"-serial", "none", 
+
+            # --- Virtio communication channel ---
+            "-chardev", f"socket,id=virtiocomm,path={VIRTIO_SOCKET},server=on,wait=off",
+            "-device", "virtio-serial-pci",
+            "-device", "virtserialport,chardev=virtiocomm,name=com.securepass.comm",
+
+            # --- QMP channel ---
+            "-qmp", f"unix:{QMP_SOCKET},server,nowait",
+
+            # --- USB passthrough (real hardware) ---
+            "-device", "qemu-xhci,id=xhci",
+            "-device", f"driver=usb-host,bus=xhci.0,vendorid=0x{vid},productid=0x{pid}"
+        ]
+
+        print("[INFO] Launching QEMU:")
+        print(" ".join(qemu_cmd))
+
+        vm_process = subprocess.Popen(qemu_cmd)
+
+        print(f"[+] VM started (PID: {vm_process.pid})")
+        
+        time.sleep(1)
+        return vm_process
+
+    except Exception as e:
+        raise Exception(f"Failed to spawn QEMU: {e}")
+
+
+# ============================================================
+#                     VIRTIO MESSAGE RECV
+# ============================================================
+
+def wait_for_virtio():
+    print("[INFO] Waiting for VM daemon messages…")
+
+    # Wait for virtio socket
+    while not os.path.exists(VIRTIO_SOCKET):
+        time.sleep(0.2)
+
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+        s.connect(VIRTIO_SOCKET)
+
+        while True:
+            data = s.recv(1024).decode().strip()
+            if data:
+                print(f"[VM → HOST] {data}")
+                return data
+
+
+# ============================================================
+#                      QMP CONTROL
+# ============================================================
+
+def qmp_send(cmd):
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.connect(QMP_SOCKET)
+            time.sleep(0.2)
+            s.recv(4096)  # QMP greeting
+            s.send((cmd + "\n").encode())
+            return s.recv(4096).decode()
+    except:
+        return None
+
+
+def kill_vm(vm):
+    print("[INFO] Stopping VM…")
+    try:
+        qmp_send('{ "execute": "system_powerdown" }')
+        vm.wait(timeout=5)
+    except:
+        print("[WARN] Hard kill")
+        vm.kill()
+
+
+def cleanup_overlay():
+    if os.path.exists(OVERLAY_IMAGE):
+        print("[INFO] Removing overlay:", OVERLAY_IMAGE)
+        os.remove(OVERLAY_IMAGE)
+
+
+# ============================================================
+#                    EXISTING USB LISTENER
+# ============================================================
+
+def handle_add_usb():
+    """
+    Listens to ADD udev events and reads the following properties:
+    - VID
+    - PID
+    - Serial Number (if present)
+    - Path
+    - Is mass storage device
+
+    Shows popup, creates status window, then runs the full
+    production scanning pipeline (overlay, virtio, QMP, OK/FAIL, copy_done).
+    """
+
+    context: Context = pyudev.Context()
+    monitor: Monitor = pyudev.Monitor.from_netlink(context)
+    monitor.filter_by(subsystem='usb')
+
+    print("=" * 60)
+    print("Waiting for new USB Devices... (Event type ADD)")
+    print("=" * 60)
+
+    for device in iter(monitor.poll, None):
+        device: pyudev.Device = device
+
+        # --- Check correct event type ---
+        if device is None or device.action != 'add':
+            continue
+
+        print(f"{device} connected")
+
+        # --- Only parent USB device ---
+        if device.get('DEVTYPE') != 'usb_device':
+            print(f"Device type is {device.get('DEVTYPE')}. Skipping.")
+            continue
+
+        # --- VID/PID extraction ---
+        vid = device.get('ID_VENDOR_ID')
+        pid = device.get('ID_MODEL_ID')
+        serial = device.get('ID_SERIAL_SHORT', None)
+
+        # Wait briefly for kernel to finish setting up children
+        time.sleep(2)
+
+        # --- Check if USB-storage interface exists ---
+        is_mass_storage = False
+        for child in device.children:
+            if (child.get('DEVTYPE') == 'usb_interface' and
+                child.get('DRIVER') == 'usb-storage'):
+                is_mass_storage = True
+                break
+
+        print("\n✅ New USB Device detected!")
+        print("-" * 40)
+        print(f"  VID               : {vid}")
+        print(f"  PID               : {pid}")
+        print(f"  Serial Number     : {serial}")
+        print(f"  Path              : {device.device_path}")
+        print(f"  Is mass storage   : {is_mass_storage}")
+        print("-" * 40)
+
+        if not is_mass_storage:
+            print("Not a mass storage device. Skipping.")
+            continue
+
+        # ---------------- popup you already implemented ----------------
+        device_info = {"vid": vid, "pid": pid, "serial": serial}
+
+        if not show_scan_popup(device_info):
+            print("🚫 Scan cancelled by user")
+            continue
+
+        # ---------------- Status Popup ----------------
+        status_window = StatusWindow(device_info)
+        status_window.start()
+        status_window.update("Building VM configuration...")
+
+        try:
+            vm_id = os.urandom(4).hex()
+            vm_name = f"{VM_NAME_PREFIX}{vm_id}"
+
+            status_window.update("Preparing VM overlay and starting headless VM...")
+
+            # --- Full Script 3 Logic (overlay + virtio + QMP) ---
+            run_prod_scan(vid, pid, vm_name, status_window)
+
+        except Exception as e:
+            status_window.update(f"Error: {str(e)}")
+            print(f"[ERROR] Exception during VM scan: {e}")
+            time.sleep(3)
+            status_window.close()
+            raise
+
+
+# ============================================================
 #                       USB LOGIC
 # ============================================================
 
@@ -262,124 +368,15 @@ def run_prod_scan(vid, pid, vm_name, status_window):
 
 
 # ============================================================
-#                    EXISTING USB LISTENER
-# ============================================================
-
-def handle_add_usb():
-    """
-    Listens to ADD udev events and reads the following properties:
-    - VID
-    - PID
-    - Serial Number (if present)
-    - Path
-    - Is mass storage device
-
-    Starts VM and attaches a connected USB device (if it is mass storage) to the started VM
-    """
-    context: Context = pyudev.Context()
-    monitor: Monitor = pyudev.Monitor.from_netlink(context)
-    monitor.filter_by(subsystem='usb')
-
-    print("=" * 60)
-    print("Waiting for new USB Devices... (Event type ADD)")
-    print("=" * 60)
-
-    for device in iter(monitor.poll, None):
-        device: pyudev.Device = device
-
-        if device is not None and device.action == 'add':
-            print('{} connected'.format(device))
-
-            # for key, value in device.items():
-            #    print(f"  {key:<20}: {value}")
-
-            # We only listen to the ADD Event of the parent type
-            if device.get('DEVTYPE') != 'usb_device':
-                print("Device type is {}. Skipping.".format(device.get('DEVTYPE')))
-                continue
-
-            # VID, PID and seriel num (for whitelist later)
-            vid = device.get('ID_VENDOR_ID')  # VID and PID is mandatory for our tool
-            pid = device.get('ID_MODEL_ID')
-            # TODO not every device has a unique serial number. Maybe VID/PID is enough for bad usb whitelist?
-            serial = device.get('ID_SERIAL_SHORT', None)
-
-            # wait to process all kernel actions
-            # TODO try shorter time
-            time.sleep(2)
-
-            is_mass_storage = False
-
-            # check if device is mass-storge devicce
-            for child in device.children:
-                if child.get('DEVTYPE') == 'usb_interface' and child.get('DRIVER') == 'usb-storage':
-                    is_mass_storage = True
-                    break
-
-            print("\n✅ New USB Device detected!")
-            print("-" * 40)
-            print(f"  VID               : {vid}")
-            print(f"  PID               : {pid}")
-            print(f"  Serial Number     : {serial}")
-            print(f"  Path              : {device.device_path}")
-            print(f"  Is mass storage   : {is_mass_storage}")
-            print("-" * 40)
-
-            if is_mass_storage:
-                # Show popup and ask user if device should be scanned
-                device_info = {
-                    'vid': vid,
-                    'pid': pid,
-                    'serial': serial
-                }
-
-                if not show_scan_popup(device_info):
-                    print("🚫 Scan cancelled by user")
-                    continue
-
-                # Create status window to show scan progress
-                status_window = StatusWindow(device_info)
-                status_window.start()
-
-                try:
-                    vm_id = os.urandom(4).hex()
-                    vm_name = f"{VM_NAME_PREFIX}{vm_id}"
-
-                    status_window.update("Building VM configuration...")
-
-                    is_vm_started = start_vm(vid, pid, vm_name)
-
-                    status_window.update("Starting VM and attaching USB device...")
-                    if is_vm_started:
-                        status_window.update("VM started successfully - Scanning USB device...")
-                        print("VM started and USB passed")
-                        # Keep status window open while VM is running
-                        time.sleep(5)  # Show success message briefly
-                        status_window.update("Scan in progress - VM is running...")
-                        # TODO: Monitor VM status and update accordingly
-                        # TODO temporary QCOW file has to be deleted manually after shutdown under vm_disk_path
-                    else:
-                        status_window.update("Error: Failed to start VM")
-                        time.sleep(3)
-                        status_window.close()
-                except Exception as e:
-                    status_window.update(f"Error: {str(e)}")
-                    time.sleep(3)
-                    status_window.close()
-                    raise
-
-
-# ============================================================
 #                       MAIN
 # ============================================================
 
 def main():
-    print("=== USBeSafe Daemon – Production Mode ===")
+    print("=== USBeSafe Daemon, Production Mode ===")
 
     # Check dependencies
     if not check_system_deps():
         return
-
 
     disable_udisks2_service()  # disable and mask udisks2 to disable automount
     handle_add_usb()

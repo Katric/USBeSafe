@@ -1,5 +1,29 @@
 #!/usr/bin/env python3
 
+# ------------------------------------------------------------
+# FIX SNAP/VSCODE ENV POLLUTION THAT BREAKS GTK/YAD
+# ------------------------------------------------------------
+import os
+
+BAD_ENV_VARS = [
+    "GTK_PATH",
+    "LOCPATH",
+    "GIO_MODULE_DIR",
+    "GTK_IM_MODULE_FILE",
+    "GTK_EXE_PREFIX",
+    "XDG_DATA_DIRS",
+    "XDG_DATA_HOME"
+]
+
+for var in BAD_ENV_VARS:
+    if var in os.environ:
+        #print(f"[ENV FIX] Removing polluted env var: {var}")
+        os.environ.pop(var, None)
+
+
+# ------------------------------------------------------------
+# Normal imports AFTER cleanup
+# ------------------------------------------------------------     
 import subprocess
 import time
 import threading
@@ -128,3 +152,21 @@ class StatusWindow:
             )
         except Exception as e:
             print(f"⚠️  Could not start yad status window: {e}")
+
+
+
+import os
+
+# Remove Snap/VSCode-injected environment variables that break GTK apps
+for var in [
+    "GTK_PATH",
+    "LOCPATH",
+    "GIO_MODULE_DIR",
+    "GTK_IM_MODULE_FILE",
+    "GTK_EXE_PREFIX",
+    "XDG_DATA_DIRS",
+    "XDG_DATA_HOME"
+]:
+    if var in os.environ:
+        print(f"[WARN] Removing polluted env var: {var}")
+        os.environ.pop(var, None)
