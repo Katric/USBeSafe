@@ -11,6 +11,15 @@
 - `vm_run.py`  
   Production runner. Boots the VM **headless** from an overlay based on `alpine-base.qcow2`, sets up virtio/QMP and orchestrates the scan workflow.
 
+- `checkAndLoadBadUSBConfig.py`
+  Reads /etc/usbesafe/usbesafe.conf, validates required keys (e.g., BAD_USB_PROTECTION=0|1), and returns a config dictionary.
+  Aborts with clear error messages when the config is missing, unreadable, or malformed.
+
+- `popup.py` 
+  Uses **yad** to:
+  - Show a "Scan USB device?" question popup with timeout
+  - Show a pulsating progress window during the scan. Used directly inside vm_run.py for user interaction.
+
 - `securepass/images/`  
   - `alpine-base.qcow2` – installed Alpine base VM (created once by `create_base_image.py`).  
   - `alpine.iso` – Alpine installer ISO (downloaded by `create_base_image.py`).
