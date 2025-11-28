@@ -8,7 +8,7 @@
 - `edit_base_image.py`  
   Development mode for the base image. Boots `alpine-base.qcow2` with GUI + networking so you can install packages, configure the scanner, and drop in `vm-daemon.sh`.
 
-- `vm_run.py`  
+- `run_headless_vm.py`  
   Production runner. Boots the VM **headless** from an overlay based on `alpine-base.qcow2`, sets up virtio/QMP and orchestrates the scan workflow.
 
 - `checkAndLoadBadUSBConfig.py`
@@ -18,7 +18,7 @@
 - `popup.py` 
   Uses **yad** to:
   - Show a "Scan USB device?" question popup with timeout
-  - Show a pulsating progress window during the scan. Used directly inside vm_run.py for user interaction.
+  - Show a pulsating progress window during the scan. Used directly inside run_headless_vm.py for user interaction.
 
 - `securepass/images/`  
   - `alpine-base.qcow2` – installed Alpine base VM (created once by `create_base_image.py`).  
@@ -47,7 +47,7 @@ sudo apt-get install -y qemu-system-x86 qemu-utils qemu-kvm wget python3
    - tweak config
 
 3. **Use for scanning (normal operation)**  
-   Run `vm_run.py` from the host:
+   Run `run_headless_vm.py` from the host:
    - creates overlay on top of `alpine-base.qcow2`
    - boots VM headless with virtio/QMP
    - waits for guest daemon messages
@@ -106,10 +106,10 @@ poweroff
 
 ---
 
-## 3️⃣ `vm_run.py` – Headless Production Run
+## 3️⃣ `run_headless_vm.py` – Headless Production Run
 
 ```sh
-python3 vm_run.py
+python3 run_headless_vm.py
 ```
 
 Behavior:
