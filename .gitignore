@@ -1,3 +1,6 @@
+# --- USBeSafe ---
+alpine/overlay.qcow2
+
 # --- OS cruft ---
 .DS_Store
 Thumbs.db
