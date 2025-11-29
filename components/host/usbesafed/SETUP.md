@@ -1,5 +1,3 @@
-!!! The File test_run_headless_vm.py is to be deleted and merged into run_headless_vm.py
-
 # USBeSafe VM Host Components
 
 ## File Overview
@@ -12,7 +10,7 @@
   Development mode for the base image. Boots `alpine-base.qcow2` with GUI + networking so you can install packages,
   configure the scanner, and drop in `vm-daemon.sh`.
 
-- `run_headless_vm.py`  
+- `host_daemon.py`  
   Production runner. Boots the VM **headless** from an overlay based on `alpine-base.qcow2`, sets up virtio/QMP and
   orchestrates the scan workflow.
 
@@ -24,7 +22,7 @@
 - `popup.py`
   Uses **yad** to:
     - Show a "Scan USB device?" question popup with timeout
-    - Show a pulsating progress window during the scan. Used directly inside run_headless_vm.py for user interaction.
+    - Show a pulsating progress window during the scan. Used directly inside host_daemon.py for user interaction.
 
 - `securepass/images/`
     - `alpine-base.qcow2` – installed Alpine base VM (created once by `create_base_image.py`).
@@ -53,7 +51,7 @@ sudo apt-get install -y qemu-system-x86 qemu-utils qemu-kvm wget python3
     - tweak config
 
 3. **Use for scanning (normal operation)**  
-   Run `run_headless_vm.py` from the host:
+   Run `host_daemon.py` from the host:
     - creates overlay on top of `alpine-base.qcow2`
     - boots VM headless with virtio/QMP
     - waits for guest daemon messages
