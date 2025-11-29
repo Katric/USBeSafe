@@ -112,7 +112,7 @@ poweroff
 
 ---
 
-## 3️⃣ `run_headless_vm.py` – Headless Production Run
+## 3️⃣ `host_daemon.py` – Headless Production Run
 
 ```sh
 sudo python3 host_daemon.py
@@ -138,7 +138,7 @@ Test the socket manually with netcat or Python:
 
 ```sh
 # Terminal 1: Start the daemon
-sudo python3 usbesafed.py
+sudo python3 host_daemon.py
 
 # Terminal 2: Send a command
 echo -n "SCAN_USB_DEVICE" | nc -U /tmp/usbesafe.sock
@@ -162,10 +162,6 @@ sock.close()
 Start program with sudo: (from )
 First download Alpine x86_64 image and put it in THIS directory (TODO: move to images dir)
 https://alpinelinux.org/downloads/
-
-```bash
-sudo .venv/bin/python components/host/usbesafed/src/usbesafed.py 
-```
 
 ## The configuration file against BadUSB Protection
 
