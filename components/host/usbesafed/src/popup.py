@@ -32,6 +32,45 @@ import threading
 POPUP_TIMEOUT = 30  # Auto-accept after 30 seconds
 
 
+def show_delete_vusb_popup(mount_path):
+    """
+    Shows a popup asking if the temporary vUSB image should be deleted.
+    Returns True if user accepts deletion.
+    """
+    
+    message = (
+        f"USB-Stick has been scanned!\n"
+        f"All files are secure and you can access them safely.\n\n"
+        f"<b>Mount Path:</b> {mount_path}\n\n"
+        f"Do you want to delete the temporary vUSB image now?\n"
+    )
+    
+    try:
+        # Use yad with a timeout counter in the button
+        result = subprocess.run(
+            [
+                "yad",
+                "--question",
+                "--title=USBeSafe - USB Device Scanned",
+                "--text=" + message,
+                "--width=400",
+                "--button=Delete vUSB Image:0",
+            ],
+            capture_output=True
+        )
+        
+        if result.returncode == 0:
+            print("✅ User accepted deletion of vUSB image")
+            return True
+        else:
+            print("❌ User declined deletion of vUSB image")
+            return False
+            
+    except Exception as e:
+        print(f"⚠️  Error showing popup: {e}, auto-accepting deletion")
+        return True
+
+
 def show_scan_popup(device_info):
     """
     Shows a popup asking if the USB device should be scanned.
