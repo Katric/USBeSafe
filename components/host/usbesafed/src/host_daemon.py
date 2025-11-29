@@ -157,7 +157,7 @@ def start_vm(vid, pid):
             "-device", "qemu-xhci,id=xhci",
             "-device", f"driver=usb-host,bus=xhci.0,vendorid=0x{vid},productid=0x{pid}"
         ]
-        
+
         if kvm_available:
             qemu_cmd.insert(1, "-enable-kvm")
             print("[INFO] KVM acceleration enabled")
@@ -274,6 +274,7 @@ def handle_add_usb():
         vid = device.get('ID_VENDOR_ID')
         pid = device.get('ID_MODEL_ID')
         serial = device.get('ID_SERIAL_SHORT', None)
+        #TODO get usb storage size
 
         # Wait briefly for kernel to finish setting up children
         time.sleep(2)
@@ -354,6 +355,7 @@ def run_prod_scan(vid, pid, status_window):
 
     if result == "ok":
         status_window.update("Scan clean, waiting for copy…")
+        # TODO enter real usb size here
         vUSB = VirtualUSBStick(image_path=VUSB_IMMAGE, size_mb=64, qmp_socket=QMP_SOCKET, device_id="vusb1")
         try: 
             vUSB.create(filesystem='vfat', label='USBeSafe')
