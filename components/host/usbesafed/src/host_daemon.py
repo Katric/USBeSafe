@@ -7,13 +7,9 @@ import time
 import socket
 from pathlib import Path
 import pyudev
+from pyudev import Monitor, Context
 
 from popup import show_scan_popup, StatusWindow
-
-
-SCRIPT_FILE_PATH = os.path.abspath(__file__)
-SCRIPT_DIR = os.path.dirname(SCRIPT_FILE_PATH)
-BASE_IMAGE_REL_TO_SCRIPT = os.path.join('..', '..', '..', '..', 'images', 'alpine-base.qcow2')
 
 # ---------------- CONFIG ----------------
 VM_NAME_PREFIX = "alpine-usb-"
@@ -102,12 +98,11 @@ def create_overlay():
 
     subprocess.run([
         "qemu-img", "create",
-        "-f", "qcow2",
-        "-F", "qcow2",              # <--- tell QEMU the base format
+        "-f", "qcow2",  # <--- format of the new image
+        "-F", "qcow2",  # <--- tell QEMU the backing image format
         "-b", str(BASE_IMAGE),
         str(OVERLAY_IMAGE)
     ], check=True)
-
 
     print("[INFO] Overlay created:", OVERLAY_IMAGE)
 
@@ -116,7 +111,7 @@ def create_overlay():
 #                     QEMU START
 # ============================================================
 
-def start_vm(vid, pid, drive_name):
+def start_vm(vid, pid):
     """
     PRODUCTION VM:
     - headless
@@ -126,7 +121,7 @@ def start_vm(vid, pid, drive_name):
     - pass through the real USB stick
     """
 
-    print(f"[INFO] Starting scanning VM for drive '{drive_name}'")
+    print(f"[INFO] Starting scanning VM")
 
     # Remove old sockets
     for s in (QMP_SOCKET, VIRTIO_SOCKET):
@@ -142,9 +137,9 @@ def start_vm(vid, pid, drive_name):
             "-drive", f"file={OVERLAY_IMAGE},format=qcow2",
 
             "-nographic",
-            
-            #QEMU won’t bind to your TTY. good for debugging /remove to get access to VM
-            #"-serial", "none", 
+
+            # QEMU won’t bind to your TTY. good for debugging /remove to get access to VM
+            # "-serial", "none",
 
             # --- Virtio communication channel ---
             "-chardev", f"socket,id=virtiocomm,path={VIRTIO_SOCKET},server=on,wait=off",
@@ -165,7 +160,7 @@ def start_vm(vid, pid, drive_name):
         vm_process = subprocess.Popen(qemu_cmd)
 
         print(f"[+] VM started (PID: {vm_process.pid})")
-        
+
         time.sleep(1)
         return vm_process
 
@@ -277,7 +272,7 @@ def handle_add_usb():
         is_mass_storage = False
         for child in device.children:
             if (child.get('DEVTYPE') == 'usb_interface' and
-                child.get('DRIVER') == 'usb-storage'):
+                    child.get('DRIVER') == 'usb-storage'):
                 is_mass_storage = True
                 break
 
@@ -307,13 +302,10 @@ def handle_add_usb():
         status_window.update("Building VM configuration...")
 
         try:
-            vm_id = os.urandom(4).hex()
-            vm_name = f"{VM_NAME_PREFIX}{vm_id}"
-
             status_window.update("Preparing VM overlay and starting headless VM...")
 
             # --- Full Script 3 Logic (overlay + virtio + QMP) ---
-            run_prod_scan(vid, pid, vm_name, status_window)
+            run_prod_scan(vid, pid, status_window)
 
         except Exception as e:
             status_window.update(f"Error: {str(e)}")
@@ -327,7 +319,7 @@ def handle_add_usb():
 #                       USB LOGIC
 # ============================================================
 
-def run_prod_scan(vid, pid, vm_name, status_window):
+def run_prod_scan(vid, pid, status_window):
     """
     Runs the ENTIRE Script 3 logic:
     - Overlay creation
@@ -339,7 +331,7 @@ def run_prod_scan(vid, pid, vm_name, status_window):
     - Cleanup
     """
     create_overlay()
-    vm = start_vm(vid, pid, vm_name)
+    vm = start_vm(vid, pid)
 
     # ---------------- FIRST MESSAGE (OK or FAIL) ----------------
     result = wait_for_virtio()

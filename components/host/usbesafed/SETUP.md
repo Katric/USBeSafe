@@ -1,30 +1,32 @@
-!!! The File test_run_headless_vm.py is to be deleted and merged into run_headless_vm.py
-
 # USBeSafe VM Host Components
 
 ## File Overview
 
 - `create_base_image.py`  
-  One-time setup. Downloads Alpine Linux, creates `alpine-base.qcow2` under `securepass/images/` and starts the interactive installer inside QEMU.
+  One-time setup. Downloads Alpine Linux, creates `alpine-base.qcow2` under `securepass/images/` and starts the
+  interactive installer inside QEMU.
 
 - `edit_base_image.py`  
-  Development mode for the base image. Boots `alpine-base.qcow2` with GUI + networking so you can install packages, configure the scanner, and drop in `vm-daemon.sh`.
+  Development mode for the base image. Boots `alpine-base.qcow2` with GUI + networking so you can install packages,
+  configure the scanner, and drop in `vm-daemon.sh`.
 
-- `run_headless_vm.py`  
-  Production runner. Boots the VM **headless** from an overlay based on `alpine-base.qcow2`, sets up virtio/QMP and orchestrates the scan workflow.
+- `host_daemon.py`  
+  Production runner. Boots the VM **headless** from an overlay based on `alpine-base.qcow2`, sets up virtio/QMP and
+  orchestrates the scan workflow.
 
 - `checkAndLoadBadUSBConfig.py`
-  Reads /etc/usbesafe/usbesafe.conf, validates required keys (e.g., BAD_USB_PROTECTION=0|1), and returns a config dictionary.
+  Reads /etc/usbesafe/usbesafe.conf, validates required keys (e.g., BAD_USB_PROTECTION=0|1), and returns a config
+  dictionary.
   Aborts with clear error messages when the config is missing, unreadable, or malformed.
 
-- `popup.py` 
+- `popup.py`
   Uses **yad** to:
-  - Show a "Scan USB device?" question popup with timeout
-  - Show a pulsating progress window during the scan. Used directly inside run_headless_vm.py for user interaction.
+    - Show a "Scan USB device?" question popup with timeout
+    - Show a pulsating progress window during the scan. Used directly inside host_daemon.py for user interaction.
 
-- `securepass/images/`  
-  - `alpine-base.qcow2` – installed Alpine base VM (created once by `create_base_image.py`).  
-  - `alpine.iso` – Alpine installer ISO (downloaded by `create_base_image.py`).
+- `securepass/images/`
+    - `alpine-base.qcow2` – installed Alpine base VM (created once by `create_base_image.py`).
+    - `alpine.iso` – Alpine installer ISO (downloaded by `create_base_image.py`).
 
 ---
 
@@ -44,16 +46,16 @@ sudo apt-get install -y qemu-system-x86 qemu-utils qemu-kvm wget python3
 
 2. **Configure base image (whenever you need to modify the VM)**  
    Run `edit_base_image.py` to boot the VM with GUI + network and:
-   - install packages (scanner, tools, shell, etc.)
-   - drop in and enable `vm-daemon.sh`
-   - tweak config
+    - install packages (scanner, tools, shell, etc.)
+    - drop in and enable `vm-daemon.sh`
+    - tweak config
 
 3. **Use for scanning (normal operation)**  
-   Run `run_headless_vm.py` from the host:
-   - creates overlay on top of `alpine-base.qcow2`
-   - boots VM headless with virtio/QMP
-   - waits for guest daemon messages
-   - coordinates scan / copy / teardown
+   Run `host_daemon.py` from the host:
+    - creates overlay on top of `alpine-base.qcow2`
+    - boots VM headless with virtio/QMP
+    - waits for guest daemon messages
+    - coordinates scan / copy / teardown
 
 ---
 
@@ -69,9 +71,9 @@ Installer steps (compact):
 
 1. Login: `root`
 2. Run: `setup-alpine`
-3. Keymap: `ge` → variant: `ge-nodeadkeys`
+3. Keymap: `de` -> `de`
 4. Hostname: Enter
-5. Network: Enter for `eth0`, DHCP, no manual config
+5. Network: 3x rEnter for `eth0`, DHCP, no manual config
 6. Root password: choose simple one (root)
 7. Timezone: `Europe/Berlin`
 8. Proxy: Enter
@@ -108,10 +110,16 @@ poweroff
 
 ---
 
-## 3️⃣ `run_headless_vm.py` – Headless Production Run
+## 3️⃣ `host_daemon.py` – Headless Production Run
 
 ```sh
-python3 run_headless_vm.py
+sudo python3 host_daemon.py
+```
+
+OR from /securepass directory
+
+```sh
+sudo .venv/bin/python components/host/usbesafed/src/host_daemon.py 
 ```
 
 Behavior:
@@ -122,15 +130,13 @@ Behavior:
 - handles ok/fail/copy-done
 - destroys overlay afterward
 
-
-
 ## Manual Communication Testing
 
 Test the socket manually with netcat or Python:
 
 ```sh
 # Terminal 1: Start the daemon
-sudo python3 usbesafed.py
+sudo python3 host_daemon.py
 
 # Terminal 2: Send a command
 echo -n "SCAN_USB_DEVICE" | nc -U /tmp/usbesafe.sock
@@ -154,10 +160,6 @@ sock.close()
 Start program with sudo: (from )
 First download Alpine x86_64 image and put it in THIS directory (TODO: move to images dir)
 https://alpinelinux.org/downloads/
-
-```bash
-sudo .venv/bin/python components/host/usbesafed/src/usbesafed.py 
-```
 
 ## The configuration file against BadUSB Protection
 
