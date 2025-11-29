@@ -1,5 +1,5 @@
 """
-run_headless_vm.py
+host_daemon.py
 ------------------
 Starts the production USBeSafe VM in fully headless mode without networking.
 Creates and uses a temporary overlay image, prepares and inserts the virtual USB
@@ -13,7 +13,7 @@ the scan completes, shuts down the VM, removes the overlay, and finally returns
 the virtual USB device back to the host.
 """
 
-#!/usr/bin/env python3
+# !/usr/bin/env python3
 
 import os
 import shutil
@@ -27,12 +27,13 @@ from popup import show_scan_popup, StatusWindow
 
 SCRIPT_FILE_PATH = os.path.abspath(__file__)
 SCRIPT_DIR = os.path.dirname(SCRIPT_FILE_PATH)
-BASE_IMAGE_REL_TO_SCRIPT = os.path.join('..', '..', '..', '..', 'images', 'alpine.qcow2')
+IMAGES_DIR_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..', '..', '..', 'images'))
+BASE_IMAGE_ABS_PATH = os.path.join(IMAGES_DIR_PATH, 'alpine-base.qcow2')
 
 # ---- CONFIG ----
 VM_NAME_PREFIX = "alpine-usb-"
 # QCOW2_BASE_IMAGE = "../../../../images/alpine-base.qcow2"
-QCOW2_BASE_IMAGE_SOURCE = os.path.normpath(os.path.join(SCRIPT_DIR, BASE_IMAGE_REL_TO_SCRIPT))
+QCOW2_BASE_IMAGE_SOURCE = os.path.normpath(os.path.join(SCRIPT_DIR, BASE_IMAGE_ABS_PATH))
 VM_DISK_DIR = "/var/lib/libvirt/images/"
 QCOW2_BASE_IMAGE = os.path.join(VM_DISK_DIR, "alpine-base.qcow2")
 VM_RAM = 1024
@@ -41,16 +42,21 @@ VM_BRIDGE = "virbr0"
 IMAGES_PATH_RELATIVE = "../../../../images/"
 
 
-def start_vm(vid, pid, drive_name):
-    print(f"[+] VM is starting (Drive name: {drive_name})")
+def start_vm(vid, pid, qcow2_drive_name):
+    print(f"[+] VM is starting (Drive name: {qcow2_drive_name})")
+    qcow2_overlay_full_name = f"{qcow2_drive_name}.qcow2"
+    # TODO /tmp is cleared after 10 days automatically. Is this enough? -> otherwise clear manually
+    overlay_path = os.path.join("/tmp", qcow2_overlay_full_name)
     try:
-        # TODO move images to images directory and change paths
-        subprocess.Popen([
+        subprocess.run([
             "qemu-img", "create",
-            "-f", "qcow2", f"{drive_name}.qcow2", "8G"
-        ], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            "-F", "qcow2",  # format of backing file
+            "-b", BASE_IMAGE_ABS_PATH,
+            "-f", "qcow2",  # format of new overlay
+            overlay_path
+        ], check=True, capture_output=True)
     except Exception as e:
-        raise Exception(f"Failed to spawn QEMU: {e}")
+        raise Exception(f"Failed to create QEMU QCOW2 Overlay: {e}")
 
     try:
         vm_process = subprocess.Popen([
@@ -68,15 +74,15 @@ def start_vm(vid, pid, drive_name):
             "-smp", "cores=1",
             "-nic", "user",
             "-boot", "once=d",
-            "-cdrom", f"alpine-standard-3.22.2-x86_64.iso",
-            "-drive", f"file={drive_name}.qcow2",
+            "-drive", f"file={overlay_path},format=qcow2",
             "-display", "gtk",
             "-enable-kvm",
             "-device", "qemu-xhci,id=xhci",
-            "-nographic",
+            # "-nographic", # TODO start with GUI temporarily
             "-device", f"driver=usb-host,bus=xhci.0,vendorid=0x{vid},productid=0x{pid}"
 
-        ], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        ], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)  # change stdX to None to see output in console
         print(f"[+] VM started (PID: {vm_process.pid})")
         time.sleep(2)
         return True
@@ -271,6 +277,12 @@ def main():
     print("╔════════════════════════════════════════════╗")
     print("║   USBeSafe Daemon - Secure USB Scanning    ║")
     print("╚════════════════════════════════════════════╝\n")
+
+    print("Paths are:")
+    print(SCRIPT_FILE_PATH)
+    print(SCRIPT_DIR)
+    print(IMAGES_DIR_PATH)
+    print(BASE_IMAGE_ABS_PATH)
 
     # Check dependencies
     if not check_system_deps():

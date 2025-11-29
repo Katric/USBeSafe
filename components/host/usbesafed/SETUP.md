@@ -115,7 +115,13 @@ poweroff
 ## 3️⃣ `run_headless_vm.py` – Headless Production Run
 
 ```sh
-python3 run_headless_vm.py
+sudo python3 host_daemon.py
+```
+
+OR from /securepass directory
+
+```sh
+sudo .venv/bin/python components/host/usbesafed/src/host_daemon.py 
 ```
 
 Behavior:
