@@ -40,6 +40,12 @@ sequenceDiagram
     systemd ->> usbesafed: Start daemon
     usbesafed->>usbesafed: Block automounting & enumeration
     usbesafed->>usbesafed: depending on config all USB-devices are authorized/unauthorized
+    usbesafed->>User: Ready - plug in USB device
+    
+    User->>PhysicalUSB: Insert USB device
+    PhysicalUSB->>usbesafed: Device detected
+    usbesafed->>User: Pop-Up: "Want to Scan Device?"
+    usbesafed->>usbesafed: Intercept & identify device type
     usbesafed->>vUSB: Create virtual USB device
     usbesafed->>VM: Launch fresh VM
     VM->>VM: Boot VM
@@ -48,12 +54,6 @@ sequenceDiagram
     Scanner->>usbesafed-vm: complete
     usbesafed-vm->>VM: complete
     VM->>usbesafed: Startup complete
-    usbesafed->>User: Ready - plug in USB device
-    
-    User->>PhysicalUSB: Insert USB device
-    PhysicalUSB->>usbesafed: Device detected
-    usbesafed->>User: Pop-Up: "Device detected! Scan will be started soon"
-    usbesafed->>usbesafed: Intercept & identify device type
     usbesafed->>usbesafed-vm: Pass USB device to VM
     usbesafed-vm->>PhysicalUSB: Mount USB device
     
@@ -179,6 +179,7 @@ sequenceDiagram
 | A11 | **Modularbeit**                            | All                          |
 | A12 | **Zwischenpräsentation**                   | All                          |
 | A13 | **Abschlusspräsentation**                  | All                          |
+| A14 | **Risikoanalyse**                          | tbd                          |
 
 
 ---
