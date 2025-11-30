@@ -253,6 +253,10 @@ def handle_add_usb():
         if device is None or device.action != 'add':
             continue
 
+        ############### SEE DEVICE ATTRIBUTES ###############
+        # for key, value in device.items():
+        #    print(f"  {key:<20}: {value}")
+
         print(f"{device} connected")
 
         # --- Only parent USB device ---
