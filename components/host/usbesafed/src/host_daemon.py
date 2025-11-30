@@ -143,7 +143,7 @@ def start_vm(vid, pid):
             "-nographic",
 
             # QEMU won’t bind to your TTY. good for debugging /remove to get access to VM
-            "-serial", "none",
+            # "-serial", "none",
 
             # --- Virtio communication channel ---
             "-chardev", f"socket,id=virtiocomm,path={VIRTIO_SOCKET},server=on,wait=off",
