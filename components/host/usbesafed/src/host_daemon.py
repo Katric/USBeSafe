@@ -11,6 +11,7 @@ from pyudev import Monitor, Context
 
 from vusb import VirtualUSBStick
 from popup import show_delete_vusb_popup, show_scan_popup, StatusWindow
+import check_and_load_bad_usb_config
 
 # ---------------- CONFIG ----------------
 VM_NAME_PREFIX = "alpine-usb-"
@@ -124,7 +125,7 @@ def start_vm(vid, pid):
     - pass through the real USB stick
     """
 
-    print(f"[INFO] Starting scanning VM")
+    print("[INFO] Starting scanning VM")
     # Check if KVM is available
     kvm_available = os.path.exists("/dev/kvm")
 
@@ -263,6 +264,10 @@ def handle_add_usb():
         if device is None or device.action != 'add':
             continue
 
+        ############### SEE DEVICE ATTRIBUTES ###############
+        # for key, value in device.items():
+        #    print(f"  {key:<20}: {value}")
+
         print(f"{device} connected")
 
         # --- Only parent USB device ---
@@ -306,6 +311,10 @@ def handle_add_usb():
         if not show_scan_popup(device_info):
             print("🚫 Scan cancelled by user")
             continue
+
+        # load usbesafe config file and extract necessary keys
+        usbesafe_config = check_and_load_bad_usb_config.load_usbesafe_config()
+        is_bad_usb_protection_active: bool = usbesafe_config.get(check_and_load_bad_usb_config.BAD_USB_PROTECTION, 0)
 
         # ---------------- Status Popup ----------------
         status_window = StatusWindow(device_info)
@@ -379,7 +388,7 @@ def run_prod_scan(vid, pid, status_window):
             status_window.update(f"vUSB mounted on host at {vUSB.host_mount}")
             
             if show_delete_vusb_popup(vUSB.host_mount):
-                vUSB.unmount_on_host()
+                vUSB.unmount_from_host()
                 os.remove(vUSB.image_path)
                 status_window.update("Temporary vUSB image deleted.")
             else:
