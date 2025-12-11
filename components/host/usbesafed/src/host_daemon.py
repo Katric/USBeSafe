@@ -9,6 +9,7 @@ from pathlib import Path
 import pyudev
 from pyudev import Monitor, Context
 
+import manage_usb_ids
 from popup import show_scan_popup, StatusWindow
 
 # ---------------- CONFIG ----------------
@@ -269,6 +270,8 @@ def handle_add_usb():
         pid = device.get('ID_MODEL_ID')
         serial = device.get('ID_SERIAL_SHORT', None)
 
+        vendor_name, product_name = manage_usb_ids.get_vendor_and_product_names(device)
+
         # Wait briefly for kernel to finish setting up children
         time.sleep(2)
 
@@ -282,8 +285,8 @@ def handle_add_usb():
 
         print("\n✅ New USB Device detected!")
         print("-" * 40)
-        print(f"  VID               : {vid}")
-        print(f"  PID               : {pid}")
+        print(f"  VID               : {vid}, {vendor_name}")
+        print(f"  PID               : {pid}, {product_name}")
         print(f"  Serial Number     : {serial}")
         print(f"  Path              : {device.device_path}")
         print(f"  Is mass storage   : {is_mass_storage}")
@@ -294,7 +297,7 @@ def handle_add_usb():
             continue
 
         # ---------------- popup you already implemented ----------------
-        device_info = {"vid": vid, "pid": pid, "serial": serial}
+        device_info = {"vid": vid, "vendor_name": vendor_name, "pid": pid, "product_name": product_name, "serial": serial}
 
         if not show_scan_popup(device_info):
             print("🚫 Scan cancelled by user")

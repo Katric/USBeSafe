@@ -46,12 +46,14 @@ def show_scan_popup(device_info):
     """
     vid = device_info.get('vid', 'Unknown')
     pid = device_info.get('pid', 'Unknown')
+    vendor_name = device_info.get('vendor_name', 'Unknown')
+    product_name = device_info.get('product_name', 'Unknown')
     serial = device_info.get('serial', 'N/A')
     
     message = (
         f"USB Mass Storage Device Detected!\n\n"
-        f"<b>VID:</b> {vid}\n"
-        f"<b>PID:</b> {pid}\n"
+        f"<b>VID:</b> {vid}, {vendor_name}\n"
+        f"<b>PID:</b> {pid}, {product_name}\n"
         f"<b>Serial:</b> {serial}\n\n"
         f"Do you want to scan this device in a secure VM?"
     )
