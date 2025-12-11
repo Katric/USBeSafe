@@ -10,6 +10,7 @@ import pyudev
 from pyudev import Monitor, Context
 
 import manage_usb_ids
+import check_and_load_bad_usb_config
 from popup import show_scan_popup, StatusWindow
 
 # ---------------- CONFIG ----------------
@@ -302,6 +303,10 @@ def handle_add_usb():
         if not show_scan_popup(device_info):
             print("🚫 Scan cancelled by user")
             continue
+
+        # load usbesafe config file and extract necessary keys
+        usbesafe_config = check_and_load_bad_usb_config.load_usbesafe_config()
+        is_bad_usb_protection_active: bool = usbesafe_config.get(check_and_load_bad_usb_config.BAD_USB_PROTECTION, 0)
 
         # ---------------- Status Popup ----------------
         status_window = StatusWindow(device_info)
