@@ -9,8 +9,9 @@ from pathlib import Path
 import pyudev
 from pyudev import Monitor, Context
 
+from vusb import VirtualUSBStick
+from popup import show_delete_vusb_popup, show_scan_popup, StatusWindow
 import check_and_load_bad_usb_config
-from popup import show_scan_popup, StatusWindow
 
 # ---------------- CONFIG ----------------
 VM_NAME_PREFIX = "alpine-usb-"
@@ -24,6 +25,8 @@ OVERLAY_IMAGE = BASE_IMAGE.parent / "overlay.qcow2"
 
 QMP_SOCKET = "/tmp/securepass_qmp.sock"
 VIRTIO_SOCKET = "/tmp/securepass_virtio.sock"
+
+VUSB_IMMAGE = Path("/tmp/vusb.img")  # temporary vUSB image location
 
 
 # ============================================================
@@ -122,7 +125,9 @@ def start_vm(vid, pid):
     - pass through the real USB stick
     """
 
-    print(f"[INFO] Starting scanning VM")
+    print("[INFO] Starting scanning VM")
+    # Check if KVM is available
+    kvm_available = os.path.exists("/dev/kvm")
 
     # Remove old sockets
     for s in (QMP_SOCKET, VIRTIO_SOCKET):
@@ -131,7 +136,6 @@ def start_vm(vid, pid):
     try:
         qemu_cmd = [
             "qemu-system-x86_64",
-            "-enable-kvm",
             "-m", "1024",
             "-smp", "2",
 
@@ -149,11 +153,17 @@ def start_vm(vid, pid):
 
             # --- QMP channel ---
             "-qmp", f"unix:{QMP_SOCKET},server,nowait",
-
+            "-usb", # Enable USB
             # --- USB passthrough (real hardware) ---
             "-device", "qemu-xhci,id=xhci",
             "-device", f"driver=usb-host,bus=xhci.0,vendorid=0x{vid},productid=0x{pid}"
         ]
+
+        if kvm_available:
+            qemu_cmd.insert(1, "-enable-kvm")
+            print("[INFO] KVM acceleration enabled")
+        else:
+            print("[WARNING] KVM not available, using software emulation (slower)")
 
         print("[INFO] Launching QEMU:")
         print(" ".join(qemu_cmd))
@@ -269,6 +279,7 @@ def handle_add_usb():
         vid = device.get('ID_VENDOR_ID')
         pid = device.get('ID_MODEL_ID')
         serial = device.get('ID_SERIAL_SHORT', None)
+        #TODO get usb storage size
 
         # Wait briefly for kernel to finish setting up children
         time.sleep(2)
@@ -353,13 +364,36 @@ def run_prod_scan(vid, pid, status_window):
 
     if result == "ok":
         status_window.update("Scan clean, waiting for copy…")
-
+        # TODO enter real usb size here
+        vUSB = VirtualUSBStick(image_path=VUSB_IMMAGE, size_mb=64, qmp_socket=QMP_SOCKET, device_id="vusb1")
+        try: 
+            vUSB.create(filesystem='vfat', label='USBeSafe')
+            vUSB.attach_to_vm()
+            status_window.update("vUSB attached to VM, waiting for copy…")
+        except Exception as e:
+            status_window.update(f"Error setting up vUSB: {e}")
+            kill_vm(vm)
+            cleanup_overlay()
+            return
         # ---------------- WAIT FOR "copy_done" ----------------
         msg = wait_for_virtio()
         if msg == "copy_done":
             status_window.update("Copy completed.")
+            time.sleep(2)
+            vUSB.detach_from_vm()
+            status_window.update("Shutting down VM…")
             kill_vm(vm)
             cleanup_overlay()
+            vUSB.mount_on_host()
+            status_window.update(f"vUSB mounted on host at {vUSB.host_mount}")
+            
+            if show_delete_vusb_popup(vUSB.host_mount):
+                vUSB.unmount_from_host()
+                os.remove(vUSB.image_path)
+                status_window.update("Temporary vUSB image deleted.")
+            else:
+                status_window.update("Temporary vUSB image kept.")
+
             return
 
     # unknown
