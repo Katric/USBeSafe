@@ -11,6 +11,7 @@ from pyudev import Monitor, Context
 
 from vusb import VirtualUSBStick
 from popup import show_delete_vusb_popup, show_scan_popup, StatusWindow
+import manage_usb_ids
 import check_and_load_bad_usb_config
 
 # ---------------- CONFIG ----------------
@@ -281,6 +282,8 @@ def handle_add_usb():
         serial = device.get('ID_SERIAL_SHORT', None)
         #TODO get usb storage size
 
+        vendor_name, product_name = manage_usb_ids.get_vendor_and_product_names(device)
+
         # Wait briefly for kernel to finish setting up children
         time.sleep(2)
 
@@ -294,8 +297,8 @@ def handle_add_usb():
 
         print("\n✅ New USB Device detected!")
         print("-" * 40)
-        print(f"  VID               : {vid}")
-        print(f"  PID               : {pid}")
+        print(f"  VID               : {vid}, {vendor_name}")
+        print(f"  PID               : {pid}, {product_name}")
         print(f"  Serial Number     : {serial}")
         print(f"  Path              : {device.device_path}")
         print(f"  Is mass storage   : {is_mass_storage}")
@@ -306,7 +309,7 @@ def handle_add_usb():
             continue
 
         # ---------------- popup you already implemented ----------------
-        device_info = {"vid": vid, "pid": pid, "serial": serial}
+        device_info = {"vid": vid, "vendor_name": vendor_name, "pid": pid, "product_name": product_name, "serial": serial}
 
         if not show_scan_popup(device_info):
             print("🚫 Scan cancelled by user")
@@ -366,7 +369,7 @@ def run_prod_scan(vid, pid, status_window):
         status_window.update("Scan clean, waiting for copy…")
         # TODO enter real usb size here
         vUSB = VirtualUSBStick(image_path=VUSB_IMMAGE, size_mb=64, qmp_socket=QMP_SOCKET, device_id="vusb1")
-        try: 
+        try:
             vUSB.create(filesystem='vfat', label='USBeSafe')
             vUSB.attach_to_vm()
             status_window.update("vUSB attached to VM, waiting for copy…")
@@ -386,7 +389,7 @@ def run_prod_scan(vid, pid, status_window):
             cleanup_overlay()
             vUSB.mount_on_host()
             status_window.update(f"vUSB mounted on host at {vUSB.host_mount}")
-            
+
             if show_delete_vusb_popup(vUSB.host_mount):
                 vUSB.unmount_from_host()
                 os.remove(vUSB.image_path)
