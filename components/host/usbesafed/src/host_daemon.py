@@ -280,7 +280,7 @@ def handle_add_usb(is_bad_usb_protection_active: bool):
         # --- VID/PID extraction ---
         vid = device.get('ID_VENDOR_ID', None)
         pid = device.get('ID_MODEL_ID', None)
-        serial = device.get('ID_SERIAL_SHORT', None)
+        serial = device.get('ID_SERIAL_SHORT', device.get('ID_SERIAL', None))
         # TODO get usb storage size
 
         if vid is None or pid is None:
