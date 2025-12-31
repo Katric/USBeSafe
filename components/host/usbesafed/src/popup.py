@@ -127,6 +127,65 @@ def show_scan_popup(device_info):
         return True
 
 
+def show_whitelist_popup(device_info):
+    """
+    Shows a popup that the detected usb device flash drive is not on the whitelist, asking if the USB device should be scanned.
+    If accepted, the pc will be unavailable for a short period of time (the pci usb controller is passed to the vm)
+    Auto-accepts after POPUP_TIMEOUT seconds with countdown.
+    Returns True if user accepts (or timeout), False if user declines.
+
+    Args:
+        device_info: Dictionary with keys 'vid', 'pid', 'serial'
+
+    Returns:
+        bool: True if scan should proceed, False otherwise
+    """
+    vid = device_info.get('vid', 'Unknown')
+    pid = device_info.get('pid', 'Unknown')
+    vendor_name = device_info.get('vendor_name', 'Unknown')
+    product_name = device_info.get('product_name', 'Unknown')
+    serial = device_info.get('serial', 'N/A')
+
+    message = (
+        f"USB Mass Storage Device Is Not Registered On The Whitelist!\n\n"
+        f"<b>VID:</b> {vid}, {vendor_name}\n"
+        f"<b>PID:</b> {pid}, {product_name}\n"
+        f"<b>Serial:</b> {serial}\n\n\n"
+        f"Do you want to scan this device in a secure VM?\n\n"
+        f"!!! YOUR COMPUTER WILL BE UNAVAILABLE FOR A SHORT PERIOD OF TIME AND YOU WILL NOT BE ABLE TO INTERACT WITH YOUR PC UNTIL THE SCAN IS FINISHED !!!\n\n"
+        f"If declined, the usb device will stay unauthorized and you will not be able to access it.\n"
+    )
+
+    try:
+        # Use yad with a timeout counter in the button
+        result = subprocess.run(
+            [
+                "yad",
+                "--question",
+                "--title=USBeSafe - Device not registered",
+                "--text=" + message,
+                "--width=800",
+                "--button=Scan Device:0",
+                "--button=Don't scan device:1",
+                "--timeout=" + str(POPUP_TIMEOUT * 2),
+                "--timeout-indicator=bottom"
+            ],
+            capture_output=True
+        )
+
+        # Return codes: 0 = Scan, 1 = Skip, 70 = Timeout (treated as accept)
+        if result.returncode in (0, 70):
+            print("✅ User accepted scan (or timeout - auto-accepted)")
+            return True
+        else:
+            print("❌ User declined scan")
+            return False
+
+    except Exception as e:
+        print(f"⚠️  Error showing popup: {e}, auto-accepting scan")
+        return True
+
+
 class StatusWindow:
     """
     Manages a status window that shows the current scan progress.
