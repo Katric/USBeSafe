@@ -129,7 +129,7 @@ def show_scan_popup(device_info):
 
 def show_whitelist_popup(device_info):
     """
-    Shows a popup that the detected usb device flash drive is not on the whitelist, asking if the USB device should be scanned.
+    Shows a popup that the detected usb device is not on the whitelist, asking if the USB device should be scanned.
     If accepted, the pc will be unavailable for a short period of time (the pci usb controller is passed to the vm)
     Auto-accepts after POPUP_TIMEOUT seconds with countdown.
     Returns True if user accepts (or timeout), False if user declines.
@@ -147,7 +147,7 @@ def show_whitelist_popup(device_info):
     serial = device_info.get('serial', 'N/A')
 
     message = (
-        f"USB Mass Storage Device Is Not Registered On The Whitelist!\n\n"
+        f"USB Device Is Not Registered On The Whitelist!\n\n"
         f"<b>VID:</b> {vid}, {vendor_name}\n"
         f"<b>PID:</b> {pid}, {product_name}\n"
         f"<b>Serial:</b> {serial}\n\n\n"
