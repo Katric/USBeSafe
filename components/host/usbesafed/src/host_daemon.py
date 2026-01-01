@@ -154,7 +154,7 @@ def start_vm(vid, pid):
 
             # --- QMP channel ---
             "-qmp", f"unix:{QMP_SOCKET},server,nowait",
-            "-usb", # Enable USB
+            "-usb",  # Enable USB
             # --- USB passthrough (real hardware) ---
             "-device", "qemu-xhci,id=xhci",
             "-device", f"driver=usb-host,bus=xhci.0,vendorid=0x{vid},productid=0x{pid}"
@@ -237,6 +237,54 @@ def cleanup_overlay():
 #                    EXISTING USB LISTENER
 # ============================================================
 
+def set_usb_autoprobe(enabled: bool):
+    """Activates or deactivates driver_autoprobe"""
+    try:
+        val = "1" if enabled else "0"
+        with open("/sys/bus/usb/drivers_autoprobe", "w") as f:
+            f.write(val)
+    except Exception as e:
+        print(f"[ERROR] Could not set driver_autoprobe: {e}")
+
+
+def safe_authorize_device(device_sys_path):
+    """
+    Authorizes the device but deactivaets driver_autoprobe before, so no drivers are loaded on the host.
+    Also sets bConfigurationValue of this device to 1.
+    """
+    print(f"Deactivating driver_autoprobe globally and authorizing device: {device_sys_path}")
+    set_usb_autoprobe(False)
+    try:
+        auth_path = os.path.join(device_sys_path, "authorized")
+        with open(auth_path, "w") as f:
+            f.write("1")
+        time.sleep(0.5) # wait a little
+    except Exception as e:
+        print(f"Error during authorization: {e} Reactivating driver_autoprobe.")
+        set_global_autoprobe(True)
+        return False
+
+    try:
+        config_path = os.path.join(device_sys_path, "bConfigurationValue")
+
+        with open(config_path, "w") as f:
+            f.write("1")
+
+        print(f"Device {device_device_path} configured (Active Config=1)")
+        time.sleep(0.5) # wait a little
+    except Exception as e:
+        print(f"ERROR: Could not set configuration: {e}")
+        return False
+
+    return True
+
+
+def restore_autoprobe():
+    """Muss aufgerufen werden, wenn wir fertig sind oder abbrechen"""
+    print("[SECURITY] Re-aktiviere globales Autoprobe")
+    set_global_autoprobe(True)
+
+
 def handle_add_usb():
     """
     Listens to ADD udev events and reads the following properties:
@@ -276,11 +324,16 @@ def handle_add_usb():
             print(f"Device type is {device.get('DEVTYPE')}. Skipping.")
             continue
 
+        print(f"🔒 Sicheres Aufwecken von {device.device_path}...")
+
+        # deactivate device_autoprobe and then authorize this device
+        safe_authorize_device(device.sys_path)
+
         # --- VID/PID extraction ---
         vid = device.get('ID_VENDOR_ID')
         pid = device.get('ID_MODEL_ID')
         serial = device.get('ID_SERIAL_SHORT', None)
-        #TODO get usb storage size
+        # TODO get usb storage size
 
         vendor_name, product_name = manage_usb_ids.get_vendor_and_product_names(device)
 
@@ -288,7 +341,7 @@ def handle_add_usb():
         time.sleep(2)
 
         # --- Check if USB-storage interface exists ---
-        is_mass_storage = False
+        is_mass_storage = True
         for child in device.children:
             if (child.get('DEVTYPE') == 'usb_interface' and
                     child.get('DRIVER') == 'usb-storage'):
@@ -309,7 +362,8 @@ def handle_add_usb():
             continue
 
         # ---------------- popup you already implemented ----------------
-        device_info = {"vid": vid, "vendor_name": vendor_name, "pid": pid, "product_name": product_name, "serial": serial}
+        device_info = {"vid": vid, "vendor_name": vendor_name, "pid": pid, "product_name": product_name,
+                       "serial": serial}
 
         if not show_scan_popup(device_info):
             print("🚫 Scan cancelled by user")
