@@ -89,7 +89,7 @@ def load_usbesafe_config():
     print("usbesafe.conf successfully read")
 
     for key, value in config_values.items():
-        print(f"{key} is set to {value}")
+        print(f"{key} is set to {value} ({bool(value)})")
 
     return config_values
 
