@@ -1,0 +1,13 @@
+#!/sbin/openrc-run
+
+command="/usr/local/bin/usbesafed-vm"
+command_background="yes"
+pidfile="/run/usbesafed-vm.pid"
+
+depend() {
+    need localmount
+}
+
+start_pre() {
+    checkpath --directory --mode 0755 /run
+}

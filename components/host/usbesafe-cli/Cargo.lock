@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "usbesafed"
+name = "usbesafe-cli"
 version = "0.1.0"

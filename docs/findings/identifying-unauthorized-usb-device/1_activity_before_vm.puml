@@ -1,0 +1,52 @@
+@startuml
+'https://plantuml.com/activity-diagram-beta
+
+start
+#palegreen:- Computer boots -;
+:Daemon is running (on system startup);
+:Daemon reads usbesafe config file;
+if (bad_usb_protection?) then (true)
+:- All USB Devices default UNauthorized\n (Driver will not be loaded)\n- Automounting disabled;
+else (false)
+:- All USB Devices default authorized\n (Driver gets loaded)\n- Automounting disabled;
+endif
+
+#palegreen:- User plugs in USB Device -;
+
+:Read USB Metadata (VID, PID, SerialNr?);
+
+if (bad_usb_protection?) then (true)
+    :Read Whitelist File;
+    if (is whitelisted?) then (true)
+        if (is mass storage?) then (true)
+            :Pass USB Flash Drive to VM;
+        else (false)
+            :Authorize USB Device;
+            stop
+        endif
+    else (false)
+        if (Pop-Up:\n- USB device is not whitelisted\n- USB Device must be scanned\n- PC will be unusable for 1-2 mins\t\n => Scan now?) then (Scan)
+        else (Cancel)
+            :USB Device stays unauthorized;
+            stop
+        endif
+        :Pass PCI USB Controller to VM;
+    endif
+else (false)
+    if (is mass storage?) then (true)
+        if (Pop-Up:\nNew USB Flash Drive detected: Scan now?\n(+ 20s Timer)) then (Scan)
+            :Pass USB Flash Drive to VM;
+        else (Cancel)
+            :Eject;
+            stop
+        endif
+    else (false)
+        stop
+    endif
+endif
+:Start VM;
+:Show Pop-Up with status (e.g. Progress-Bar);
+:Send Event with VID/PID + Bad USB setting via virtio socket;
+stop
+
+@enduml

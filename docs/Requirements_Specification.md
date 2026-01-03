@@ -13,6 +13,76 @@
 
 ### USBeSafe Workflow
 
+1. `usbesafed` is started by systemd on boot
+2. `usbesafed` will now block automounting and enumerating USB devices. Depending on the config, all devices are unauthorized/authorized
+2. `usbesafed` creates a virtual USB device and launches a fresh VM
+3. User plugs in a device
+4. `usbesafed` intercepts the device and identifies that it actually is a USB device
+5. After examination, `usbesafed` passes the USB device to `usbesafed-vm` inside the VM
+6. `usbesafed-vm` mounts the USB device
+7. `usbesafed-vm` autmatically scans all files on the devices
+8. `usbesafed-vm` sends a boolean to `usbesafed` wheather all files are safe (true) or one or more are bad (false) and a short description which files are bad
+9.  If true: `usbesafed` mounts the virtual usb stick to the guest vm and make it visible for the host system restarts the VM
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant systemd
+    participant PhysicalUSB as Physical USB Device
+    participant CLI
+    participant usbesafed as usbesafed (Host Daemon)
+    participant vUSB as Virtual USB Device
+    participant VM
+    participant usbesafed-vm as usbesafed-vm (Guest Daemon)
+    participant Scanner
+
+    User ->>systemd: Boot host system
+    systemd ->> usbesafed: Start daemon
+    usbesafed->>usbesafed: Block automounting & enumeration
+    usbesafed->>usbesafed: depending on config all USB-devices are authorized/unauthorized
+    usbesafed->>User: Ready - plug in USB device
+    
+    User->>PhysicalUSB: Insert USB device
+    PhysicalUSB->>usbesafed: Device detected
+    usbesafed->>User: Pop-Up: "Want to Scan Device?"
+    usbesafed->>usbesafed: Intercept & identify device type
+    usbesafed->>vUSB: Create virtual USB device
+    usbesafed->>VM: Launch fresh VM
+    VM->>VM: Boot VM
+    VM->>usbesafed-vm: Start Daemon
+    usbesafed-vm->>Scanner: Initalize Scanner
+    Scanner->>usbesafed-vm: complete
+    usbesafed-vm->>VM: complete
+    VM->>usbesafed: Startup complete
+    usbesafed->>usbesafed-vm: Pass USB device to VM
+    usbesafed-vm->>PhysicalUSB: Mount USB device
+    
+    usbesafed-vm->>Scanner: Execute scan on all files
+    Scanner->>usbesafed-vm: Return scan results
+    usbesafed-vm->>usbesafed: Send scan results
+        
+    alt One or more files are malicious (red)
+        usbesafed->>VM: kill VM
+        VM->>VM: kill
+        VM->>usbesafed: killed
+        usbesafed->>User: Pop-Up: "Malicous Files on ur USB-Device"
+    else All files are safe (green)
+        usbesafed->>vUSB: Mount to VM
+        vUSB->>VM: Mount
+        VM->>usbesafed-vm: Virtual USB is visible
+        usbesafed-vm->>vUSB: Transfer files
+        usbesafed->>User: Make virtual USB visible (mount)
+        User->>vUSB: Acess Files on virtual USB
+    end
+    User->>CLI: End session
+    CLI->>usbesafed: Terminate session
+    usbesafed->>VM: Destroy VM
+    usbesafed->>vUSB: Clean up virtual USB
+```
+
+
+### USBeSafe Workflow with File selection
+
 1. User activates `usbesafed` via the CLI
 2. `usbesafed` will now block automounting and enumerating USB devices
 2. `usbesafed` creates a virtual USB device and launches a fresh VM
@@ -29,6 +99,62 @@
 13. Those files are sent to `usbesafed` which sends it to `usbesafed-vm` and writes it to the virtual USB device
 14. `usbesafed` makes the virtual USB device visible to the user (mount?)
 15. After the session is done (via some user input), `usbesafed` destroys the VM
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant systemd
+    participant PhysicalUSB as Physical USB Device
+    participant CLI
+    participant usbesafed as usbesafed (Host Daemon)
+    participant vUSB as Virtual USB Device
+    participant VM
+    participant usbesafed-vm as usbesafed-vm (Guest Daemon)
+    participant Scanner
+
+    User ->>systemd: Boot host system
+    systemd ->> usbesafed: Start daemon
+    usbesafed ->> usbesafed: Idle  
+    User->>CLI: "usbesafe start"
+    CLI->>usbesafed: Activate daemon
+    usbesafed->>usbesafed: Block automounting & enumeration
+    usbesafed->>vUSB: Create virtual USB device
+    usbesafed->>VM: Launch fresh VM
+    usbesafed->>VM: Mount virtual USB
+    usbesafed->>User: Ready - plug in USB device
+    
+    User->>PhysicalUSB: Insert USB device
+    PhysicalUSB->>usbesafed: Device detected
+    usbesafed->>usbesafed: Intercept & identify device type
+    usbesafed->>usbesafed-vm: Pass USB device to VM
+    usbesafed-vm->>PhysicalUSB: Mount USB device
+    
+    usbesafed-vm->>usbesafed-vm: Read file metadata
+    usbesafed-vm->>usbesafed: Send metadata
+    usbesafed->>CLI: Forward metadata
+    CLI->>User: Display metadata
+    
+    User->>CLI: Select files for scanning
+    CLI->>usbesafed: Send file selection
+    usbesafed->>usbesafed-vm: Forward file selection
+    usbesafed-vm->>Scanner: Execute scan on selected files
+    Scanner->>usbesafed-vm: Return scan results
+    usbesafed-vm->>usbesafed: Send scan results
+    usbesafed->>CLI: Forward scan results
+    CLI->>User: Display results (green/yellow/red)
+    
+    User->>CLI: Select files to save (green/yellow)
+    CLI->>usbesafed: Send file selection
+    usbesafed->>usbesafed-vm: Request selected files
+    usbesafed-vm->>vUSB: Transfer files
+    usbesafed->>User: Make virtual USB visible (mount)
+    User->>vUSB: Acess Files on virtual USB
+    
+    User->>CLI: End session
+    CLI->>usbesafed: Terminate session
+    usbesafed->>VM: Destroy VM
+    usbesafed->>vUSB: Clean up virtual USB
+```
 
 ### Ideas:
 - [ ] Shared Zotero group for literature? → unified `.bib` file  
@@ -53,6 +179,7 @@
 | A11 | **Modularbeit**                            | All                          |
 | A12 | **Zwischenpräsentation**                   | All                          |
 | A13 | **Abschlusspräsentation**                  | All                          |
+| A14 | **Risikoanalyse**                          | tbd                          |
 
 
 ---
