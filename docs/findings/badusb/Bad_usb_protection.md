@@ -174,3 +174,28 @@ E:  Ad=81(I) Atr=03(Int.) MxPS=   8 Ivl=10ms
 ---
 Command to find usb by pid:
 `grep -l "b64f" /sys/bus/usb/devices/*/idProduct`
+
+# Experiment with bad usb
+Pi Pico with this github project:
+https://github.com/kacperbartocha/pico-badusb
+
+With this Payload:
+```
+DELAY 1000
+HOTKEY CTRL ALT T
+DELAY 1000
+STRING xdg-open https://youtu.be/dQw4w9WgXcQ
+PRESS ENTER
+```
+Waits 1 s after inserting, Opens Terminal using Ubuntu Shortcut, opens default browser with rick roll url.
+
+## Experiment 1: Does it execute with authorized_default 0?
+Result:
+## Experiment 2: Does it execute after authorizing?
+Result:
+## Experiment 3: Does it execute with authorized_default 0 + driver autoprobing 0 + authorized 1?
+Result:
+## Experiment 4: Does it execute with only driver autoprobing 0 (as default?)?
+Result:
+What are the drawbacks?
+- not very convenient, but we could manually trigger driver probing after scans finished
