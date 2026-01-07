@@ -5,8 +5,19 @@ set -euo pipefail
 if [ "$EUID" -ne 0 ]; then
     echo "This script must be run as root."
     exit 1
-
 fi
+
+# Enable Alpine community repository (v3.22) to be able to install clamav
+APK_REPO_FILE="/etc/apk/repositories"
+COMMUNITY_REPO="http://dl-cdn.alpinelinux.org/alpine/v3.22/community"
+
+if grep -qE "^\s*#\s*${COMMUNITY_REPO}$" "$APK_REPO_FILE"; then
+    sed -i "s|^\s*#\s*${COMMUNITY_REPO}$|${COMMUNITY_REPO}|" "$APK_REPO_FILE"
+fi
+
+# Update package index and install ClamAV packages
+apk update
+apk add clamav clamav-daemon clamav-libunrar
 
 ROOT="/opt/usbesafe"
 DAEMON_BIN="host/usbesafed/target/debug/usbesafed"
