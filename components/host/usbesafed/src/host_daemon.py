@@ -419,8 +419,15 @@ def run_prod_scan(vid, pid, status_window):
 
     if result == "ok":
         status_window.update("Scan clean, waiting for copy…")
-        # TODO enter real usb size here
-        vUSB = VirtualUSBStick(image_path=VUSB_IMMAGE, size_mb=64, qmp_socket=QMP_SOCKET, device_id="vusb1")
+        # ---------------- SECOND MESSAGE (USB SIZE) ----------------
+        real_usb_size_gb = wait_for_virtio()
+        if not real_usb_size_gb.isdigit():
+            status_window.update("Error: Invalid USB size received from VM.")
+            kill_vm(vm)
+            cleanup_overlay()
+            return
+        status_window.update(f"Preparing vUSB of size {real_usb_size_gb} GB...")
+        vUSB = VirtualUSBStick(image_path=VUSB_IMMAGE, size_mb=int(real_usb_size_gb) * 1024, qmp_socket=QMP_SOCKET, device_id="vusb")
         try:
             vUSB.create(filesystem='vfat', label='USBeSafe')
             vUSB.attach_to_vm()

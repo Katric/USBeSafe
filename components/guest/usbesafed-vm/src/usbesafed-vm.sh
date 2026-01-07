@@ -254,8 +254,8 @@ while :; do
     # 3a) Scan OK
     # ------------------------------------------------------
     log "Scan result: OK"
+    send_virtio "ok"     # positive scan result
     send_usb_size_gb     # inform host about required vUSB size
-    send_virtio "ok"    # positive scan result
   else
     # ------------------------------------------------------
     # 3b) Scan FAIL
@@ -275,7 +275,11 @@ while :; do
   # ----------------------------------------------------------
   # 4) Wait for VIRTUAL USB stick (host attaches via QMP)
   # ----------------------------------------------------------
-  wait_for_dir "$VUSB_MOUNT"
+  while [ ! -d "$VUSB_MOUNT" ]; do
+    if ! mount -t vfat /dev/disk/by-label/USBeSafe "$VUSB_MOUNT" 2>/dev/null; then
+      sleep "$POLL_SEC"
+    fi
+  done
   log "Virtual USB detected"
 
   # ----------------------------------------------------------
