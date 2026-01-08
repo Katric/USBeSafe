@@ -14,6 +14,9 @@ The VM already contains all core components required for installation, virus sca
 **Role in the workflow:**
 - executed **first** to bootstrap the VM and prepare it for daemon-based operation
 
+**VM Path:**
+- /usr/local/sbin/securepass-init.sh
+
 ---
 
 ### 2 `scanner/scanner.py`
@@ -25,6 +28,9 @@ The VM already contains all core components required for installation, virus sca
 
 **Role in the workflow:**
 - called by the daemon whenever a scan operation is requested
+
+**VM Path:**
+- /opt/scanner/scanner.py
 
 ---
 
@@ -39,6 +45,9 @@ The VM already contains all core components required for installation, virus sca
 **Role in the workflow:**
 - acts as the central orchestration and communication layer within the VM
 
+**VM Path:**
+/usr/local/bin/usbesafed-vm.sh
+
 ---
 
 ### 4 `usbesafed-vm/src/usbesafed-vm.init`
@@ -52,6 +61,21 @@ The VM already contains all core components required for installation, virus sca
 **Role in the workflow:**
 - provides the service wrapper that allows the daemon to run as a managed system service
 
+**VM Path:**
+/etc/init.d/usbesafed-vm
+
+---
+
+### 5 `placeholder/placeholder/`
+**Purpose:**
+
+**Responsibilities:**
+
+**Role in the workflow:**
+
+**VM Path:**
+- /opt/scanner/placeholder.py
+
 ---
 
 ## Logical Execution Flow
@@ -59,4 +83,5 @@ The VM already contains all core components required for installation, virus sca
 1. **Bootstrap:** `install.sh` prepares the VM (packages, autologin).
 2. **Service Management:** `usbesafed-vm.init` enables OpenRC to manage the daemon lifecycle.
 3. **Runtime:** `usbesafed-vm.sh` runs as a persistent daemon and waits for scan requests.
-4. **Scan Execution:** `scanner.py` performs the actual virus scanning and returns results.
+4. Placeholder
+5. **Scan Execution:** `scanner.py` performs the actual virus scanning and returns results.
