@@ -92,6 +92,63 @@ def disable_udisks2_service(is_bad_usb_protection_active: bool):
         return False
 
 
+def set_usb_default_authorization(enable: bool):
+    """
+    Iterates over all USB root hubs and sets the 'authorized_default' value.
+
+    Args:
+        enable (bool):
+            If True, sets authorized_default to '1' (Auto-authorize new devices).
+            If False, sets authorized_default to '0' (Do not authorize new devices).
+    """
+    base_path = Path("/sys/bus/usb/devices")
+
+    # Determine the string value to write based on the boolean input
+    target_value = "1" if enable else "0"
+    state_desc = "ENABLED" if enable else "DISABLED"
+
+    print(f"[INFO] Auto-authorization will be {state_desc} ({target_value})...")
+
+    if not base_path.exists():
+        print(f"[ERROR]: Path {base_path} does not exist. Are you using a Linux OS :D ?")
+        return
+
+    changed_count = 0
+
+    # Iterate over all items in the directory
+    for device_dir in base_path.iterdir():
+        # Filter: We only want Root Hubs (e.g., usb1, usb2, usb10)
+        # We ignore sub-devices like '1-1'
+        if device_dir.name.startswith("usb") and device_dir.name[3:].isdigit():
+
+            auth_file = device_dir / "authorized_default"
+
+            if auth_file.exists():
+                try:
+                    # Read current value to check if an update is actually needed
+                    current_val = auth_file.read_text().strip()
+
+                    if current_val != target_value:
+                        # Write the new value
+                        auth_file.write_text(target_value)
+                        print(
+                            f"[OK] {device_dir.name}: authorized_default changed from {current_val} to {target_value}.")
+                        changed_count += 1
+                    else:
+                        print(f"[INFO] {device_dir.name}: Already set to {target_value}.")
+
+                except PermissionError:
+                    print(f"[ERROR] Permission denied for {device_dir.name}. Please run with 'sudo'.")
+                except Exception as e:
+                    print(f"[ERROR] Failed to access {device_dir.name}: {e}")
+            else:
+                # Some controllers might not support this attribute
+                print(f"[SKIP] {device_dir.name}: File 'authorized_default' not found.")
+
+    print("-" * 40)
+    print(f"[INFO] Done. Updated {changed_count} USB buses to {target_value}.")
+
+
 # ============================================================
 #                     OVERLAY CREATION
 # ============================================================
@@ -238,30 +295,68 @@ def cleanup_overlay():
 #                    EXISTING USB LISTENER
 # ============================================================
 
+# Only for debug purposes
+def is_usb_device_a_mass_storage(device) -> bool:
+    is_mass_storage = False
+    try:
+        print("[DEBUG] Checking if usb device is a mass storage")
+        for child in device.children:
+            if (child.get('DEVTYPE') == 'usb_interface' and
+                    child.get('DRIVER') == 'usb-storage'):
+                is_mass_storage = True
+                break
+    except Exception as e:
+        print("[DEBUG] Error while gathering information of usb device: ", e)
+    return is_mass_storage
+
+
 def set_usb_autoprobe(enabled: bool):
     """Activates or deactivates driver_autoprobe"""
     try:
         val = "1" if enabled else "0"
         with open("/sys/bus/usb/drivers_autoprobe", "w") as f:
             f.write(val)
+        if enabled:
+            print("[INFO] USB autoprobe enabled")
+        else:
+            print("[INFO] USB autoprobe disabled")
     except Exception as e:
         print(f"[ERROR] Could not set driver_autoprobe: {e}")
 
 
-def safe_authorize_device(device_sys_path):
+def set_authorize_device(device_sys_path, enable: bool) -> bool:
     """
-    Authorizes the device but deactivaets driver_autoprobe before, so no drivers are loaded on the host.
-    Also sets bConfigurationValue of this device to 1.
+    Activates or deactivates authorization
+    :param device_sys_path: The path to the device
+    :param enable: Whether to enable or disable authorization
+    :returns: True or False if setting the authorization value was successful
     """
-    print(f"Deactivating driver_autoprobe globally and authorizing device: {device_sys_path}")
-    set_usb_autoprobe(False)
     try:
+        val = "1" if enable else "0"
         auth_path = os.path.join(device_sys_path, "authorized")
         with open(auth_path, "w") as f:
-            f.write("1")
-        time.sleep(0.5)  # wait a little
+            f.write(val)
+        if val:
+            print(f"[INFO] Successfully authorized device {device_sys_path}")
+        else:
+            print(f"[INFO] Successfully unauthorized device {device_sys_path}")
+        return True
     except Exception as e:
-        print(f"Error during authorization: {e} Reactivating driver_autoprobe.")
+        print(f"[Error] An error occurred during authorization: {e}")
+        return False
+
+
+def safe_authorize_device(device_sys_path):
+    """
+    Authorizes the device but deactivates driver_autoprobe before, so no drivers are loaded on the host.
+    Also sets bConfigurationValue of this device to 1.
+    """
+    print(f"[INFO] Deactivating driver_autoprobe globally and authorizing device: {device_sys_path}")
+    set_usb_autoprobe(False)
+    if set_authorize_device(device_sys_path,True):
+        time.sleep(0.5)  # wait a little
+    else:
+        print("Reactivating driver_autoprobe...")
         set_usb_autoprobe(True)
         return False
 
@@ -271,7 +366,7 @@ def safe_authorize_device(device_sys_path):
         with open(config_path, "w") as f:
             f.write("1")
 
-        print(f"Device {device_sys_path} configured (Active Config=1)")
+        print(f"[INFO] Device {device_sys_path} bConfigurationValue configured (Active Config=1)")
         time.sleep(0.5)  # wait a little
     except Exception as e:
         print(f"ERROR: Could not set configuration: {e}")
@@ -312,17 +407,14 @@ def handle_add_usb(is_bad_usb_protection_active: bool):
         # for key, value in device.items():
         #    print(f"  {key:<20}: {value}")
 
-        print(f"{device} connected")
+        print(f"[INFO] {device} connected")
 
         # --- Only parent USB device ---
         if device.get('DEVTYPE') != 'usb_device':
             print(f"Device type is {device.get('DEVTYPE')}. Skipping.")
             continue
 
-        print(f"🔒 Sicheres Aufwecken von {device.device_path}...")
-
-        # deactivate device_autoprobe and then authorize this device
-        safe_authorize_device(device.sys_path)
+        print(f"[INFO] Safe wakeup of {device.device_path}...")
 
         # --- VID/PID extraction ---
         vid = device.get('ID_VENDOR_ID', None)
@@ -341,13 +433,8 @@ def handle_add_usb(is_bad_usb_protection_active: bool):
         # Wait briefly for kernel to finish setting up children
         time.sleep(2)
 
-        # --- Check if USB-storage interface exists ---
-        is_mass_storage = True
-        for child in device.children:
-            if (child.get('DEVTYPE') == 'usb_interface' and
-                    child.get('DRIVER') == 'usb-storage'):
-                is_mass_storage = True
-                break
+        # FOR DEBUG --> Should not be possible to return a result
+        is_mass_storage = is_usb_device_a_mass_storage(device)
 
         print("\n✅ New USB Device detected!")
         print("-" * 40)
@@ -357,72 +444,39 @@ def handle_add_usb(is_bad_usb_protection_active: bool):
         print(f"  Path              : {device.device_path}")
         print(f"  Is mass storage   : {is_mass_storage}")
         print("-" * 40)
+        print("\n")
 
         device_info = {"vid": vid, "vendor_name": vendor_name, "pid": pid, "product_name": product_name,
                        "serial": serial}
 
-        # ########################################
-        # ########## BAD_USB_PROTECTION ##########
-        # ########################################
-
-        if is_bad_usb_protection_active:
-            # hash usb device and register it on the whitelist (as wished by the user)
-            device_hash_for_whitelisting = manage_usb_ids.get_hashed_device_attributes(device)
-            is_on_whitelist = manage_usb_ids.is_device_whitelisted(device_hash_for_whitelisting)
-            if is_on_whitelist:
-                print("[Info] Device is present on the whitelist.")
-
-                # If 'is_mass_storage'      ->  forwarding usb stick to VM without asking the user
-                # Else 'not a mass storage' ->  usb device will be authorized immediately (e.g. a keyboard was detected)
-                if is_mass_storage:
-                    print("[Info] Device is identified as a flash drive. Forwarding usb device to VM...")
-                    try:
-                        status_window.update("Preparing VM overlay and starting headless VM...")
-
-                        # --- Full Script 3 Logic (overlay + virtio + QMP) ---
-                        run_prod_scan(vid, pid, status_window)
-
-                    except Exception as e:
-                        status_window.update(f"Error: {str(e)}")
-                        print(f"[ERROR] Exception during VM scan: {e}")
-                        time.sleep(3)
-                        status_window.close()
-                        raise
-
-                else:
-                    print("[Info] Device is NOT identified as a flash drive. USB Device will be authorized...")
-                    # TODO: authorize usb device to host pc
-
-            else:
-                print("[Warning] Device is NOT present on the whitelist and needs to be scanned.")
-                # If 'scan'         ->  pass PCI Controller to VM
-                # Else 'don't scan' ->  reject USB device and let it stay unauthorized
-                if not popup.show_whitelist_popup(device_info):
-                    print("🚫 Scan cancelled by user")
-                    continue
-                else:
-                    print("[Info] Scan accepted. PCI Controller will be passed to VM for secure scanning...")
-                    # TODO: implement forwarding PCI controller to VM
-
-                # manage_usb_ids.add_to_whitelist_file(device_hash_for_whitelisting)    # <-- registers an usb stick to the whitelist
+        # check if usb device is already on the whitelist
+        device_hash_for_whitelisting = manage_usb_ids.get_hashed_device_attributes(device)
+        is_on_whitelist = manage_usb_ids.is_device_whitelisted(device_hash_for_whitelisting)
+        if is_on_whitelist:
+            print("[Info] Device is present on the whitelist.")
+            print(f"[Info] Authorize device {device.sys_path}...")
+            set_authorize_device(device.sys_path, True)
+            print("[OK] Check complete. Device can now be used on the host system")
+            # TODO: Ist das schon alles?
+            continue
 
         else:
-            # if usb-protection is turned off
+            print("[Warning] Device is NOT present on the whitelist and needs to be scanned.")
+            # If 'scan'         ->  pass PCI Controller to VM
+            # Else 'don't scan' ->  reject USB device and let it stay unauthorized
 
-            if not is_mass_storage:
-                print("Not a mass storage device. Skipping.")
-                continue
-
-            # ---------------- popup you already implemented ----------------
-            if not show_scan_popup(device_info):
+            if not popup.show_whitelist_popup(device_info):
                 print("🚫 Scan cancelled by user")
                 continue
 
-            # ---------------- Status Popup ----------------
+            print("[Info] Scan accepted by user (or auto-timeout). Device will be passed to VM for secure scanning...")
+            # TODO: implement forwarding PCI controller to VM
+            # deactivate device_autoprobe and then authorize this device
+            safe_authorize_device(device.sys_path)
+
             status_window = StatusWindow(device_info)
             status_window.start()
             status_window.update("Building VM configuration...")
-
             try:
                 status_window.update("Preparing VM overlay and starting headless VM...")
 
@@ -436,6 +490,7 @@ def handle_add_usb(is_bad_usb_protection_active: bool):
                 status_window.close()
                 raise
 
+            # manage_usb_ids.add_to_whitelist_file(device_hash_for_whitelisting)    # <-- registers an usb stick to the whitelist
 
 # ============================================================
 #                       USB LOGIC
@@ -530,6 +585,11 @@ def main():
     if not check_system_deps():
         return
 
+    # ########## To Restore functionality xD ##########
+    # set_usb_default_authorization(True)
+    # set_usb_autoprobe(True)
+    # # Disable 'authorized_default' values on all usb bus systems
+    set_usb_default_authorization(False)
     is_protection_active: bool = is_bad_usb_protection_active()
     disable_udisks2_service(is_protection_active)  # disable and mask udisks2 to disable automount
     handle_add_usb(is_protection_active)
