@@ -520,6 +520,7 @@ def run_prod_scan(vid, pid, status_window, device_hash: str):
     if result == "fail":
         status_window.update("Scan FAILED, malware detected!")
         kill_vm_and_cleanup_overlay(vm)
+        # TODO: authorized = 0, eject device, drivers_autoprobing = 1
         return
 
     if result == "ok":
@@ -527,6 +528,8 @@ def run_prod_scan(vid, pid, status_window, device_hash: str):
         if is_mass_storage == "False":
             print("[Info] Device will be added to whitelist...")
             manage_usb_ids.add_to_whitelist_file(device_hash)
+
+        # TODO: drivers_autoprobing = 1, authorized = 1
 
         status_window.update("Scan clean, waiting for copy…")
         # ---------------- SECOND MESSAGE (USB SIZE) ----------------
