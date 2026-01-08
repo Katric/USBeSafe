@@ -17,7 +17,7 @@ if grep -qE "^\s*#\s*${COMMUNITY_REPO}$" "$APK_REPO_FILE"; then
 fi
 
 apk update
-apk add --no-cache clamav clamav-daemon clamav-libunrar
+apk add --no-cache clamav clamav-daemon clamav-libunrar mount
 
 # Optional: do NOT enable clamd unless you really want it
 # rc-update del clamd default || true
