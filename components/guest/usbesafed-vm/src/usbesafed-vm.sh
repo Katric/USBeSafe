@@ -92,13 +92,12 @@ send_virtio() {
 }
 
 wait_for_dir() {
-  # Block until a directory exists
-  # Used for detecting USB mount points
-  log "Waiting for directory: $1"
-  while [ ! -d "$1" ]; do
+  # Block until a filesystem is actually mounted at the given path
+  log "Waiting for mount at: $1"
+  while ! mount | grep -q " $1 "; do
     sleep "$POLL_SEC"
   done
-  log "Directory available: $1"
+  log "Mounted filesystem detected at: $1"
 }
 
 run_scan() {
