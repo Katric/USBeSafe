@@ -259,10 +259,10 @@ def safe_authorize_device(device_sys_path):
         auth_path = os.path.join(device_sys_path, "authorized")
         with open(auth_path, "w") as f:
             f.write("1")
-        time.sleep(0.5) # wait a little
+        time.sleep(0.5)  # wait a little
     except Exception as e:
         print(f"Error during authorization: {e} Reactivating driver_autoprobe.")
-        set_global_autoprobe(True)
+        set_usb_autoprobe(True)
         return False
 
     try:
@@ -271,19 +271,13 @@ def safe_authorize_device(device_sys_path):
         with open(config_path, "w") as f:
             f.write("1")
 
-        print(f"Device {device_device_path} configured (Active Config=1)")
-        time.sleep(0.5) # wait a little
+        print(f"Device {device_sys_path} configured (Active Config=1)")
+        time.sleep(0.5)  # wait a little
     except Exception as e:
         print(f"ERROR: Could not set configuration: {e}")
         return False
 
     return True
-
-
-def restore_autoprobe():
-    """Muss aufgerufen werden, wenn wir fertig sind oder abbrechen"""
-    print("[SECURITY] Re-aktiviere globales Autoprobe")
-    set_global_autoprobe(True)
 
 
 def handle_add_usb(is_bad_usb_protection_active: bool):
@@ -480,7 +474,8 @@ def run_prod_scan(vid, pid, status_window):
             cleanup_overlay()
             return
         status_window.update(f"Preparing vUSB of size {real_usb_size_gb} GB...")
-        vUSB = VirtualUSBStick(image_path=VUSB_IMMAGE, size_mb=int(real_usb_size_gb) * 1024, qmp_socket=QMP_SOCKET, device_id="vusb")
+        vUSB = VirtualUSBStick(image_path=VUSB_IMMAGE, size_mb=int(real_usb_size_gb) * 1024, qmp_socket=QMP_SOCKET,
+                               device_id="vusb")
         try:
             vUSB.create(filesystem='vfat', label='USBeSafe')
             vUSB.attach_to_vm()
