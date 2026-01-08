@@ -43,7 +43,8 @@ def check_system_deps():
         "qemu-img": "qemu-utils",
         "wget": "wget",
         "virsh": "virsh",
-        "yad": "yad"
+        "yad": "yad",
+        "xterm": "xterm"
     }
 
     for tool, package in tools.items():
@@ -55,7 +56,7 @@ def check_system_deps():
         print(f"Missing system packages detected: {missing}\n")
         print("To install on Debian/Ubuntu, run:")
         print("  sudo apt-get update")
-        print("  sudo apt-get install -y qemu-system-x86 qemu-utils libvirt-clients qemu-kvm wget curl yad\n")
+        print("  sudo apt-get install -y qemu-system-x86 qemu-utils libvirt-clients qemu-kvm wget curl yad xterm\n")
         print("Then re-run the daemon.\n")
         return False
 
@@ -224,10 +225,13 @@ def start_vm(vid, pid):
         else:
             print("[WARNING] KVM not available, using software emulation (slower)")
 
-        print("[INFO] Launching QEMU:")
+        terminal_cmd = ["xterm", "-title", "VM Output", "-e"]
+        final_cmd = terminal_cmd + qemu_cmd
+
+        print("[INFO] Launching QEMU in new terminal:")
         print(" ".join(qemu_cmd))
 
-        vm_process = subprocess.Popen(qemu_cmd)
+        vm_process = subprocess.Popen(final_cmd)
 
         print(f"[+] VM started (PID: {vm_process.pid})")
 
