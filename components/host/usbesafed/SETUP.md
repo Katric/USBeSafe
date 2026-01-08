@@ -14,6 +14,10 @@
   Production runner. Boots the VM **headless** from an overlay based on `alpine-base.qcow2`, sets up virtio/QMP and
   orchestrates the scan workflow.
 
+- `host_daemon_test.py`  
+  Test Production runner. Boots the VM **GUI** from an overlay based on `alpine-base.qcow2`, sets up virtio/QMP and
+  orchestrates the scan workflow. Used for testing.
+
 - `checkAndLoadBadUSBConfig.py`
   Reads /etc/usbesafe/usbesafe.conf, validates required keys (e.g., BAD_USB_PROTECTION=0|1), and returns a config
   dictionary.

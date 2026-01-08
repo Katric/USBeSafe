@@ -173,4 +173,8 @@ To verify that VM → Host communication works:
 
 ---
 
+## Check for Errors/Debugging
+
+- In the vm run `grep usbesafed-vm /var/log/messages` to get the logs
+
 ## End of Document

@@ -47,6 +47,23 @@ set -eu
 # Placeholder paths (adjust later)
 # -----------------------------
 
+# ============================================================
+# Startup Banner
+# ============================================================
+
+# Used for logging the vm, logs can be looke at by running `grep usbesafed-vm /var/log/messages` in the vm
+log() {
+  logger -t usbesafed-vm -- "$*"
+}
+
+
+log "============================================================"
+log "USBeSafe VM Daemon started"
+log "Role      : Guest-side USB scanning daemon"
+log "State     : Initializing"
+log "============================================================"
+
+
 # Mount point of the real, physical USB stick inside the VM
 REAL_USB_MOUNT="/mnt/realusb"
 
@@ -69,11 +86,6 @@ mkdir -p "$REAL_USB_MOUNT" "$VUSB_MOUNT"
 # Helper functions
 # -----------------------------
 
-log() {
-  # Log to stderr so logs don't interfere with virtio output
-  echo "[usbesafed-vm] $*" >&2
-}
-
 send_virtio() {
   # Send a single line message to the host via virtio
   # This is the ONLY communication channel VM → Host
@@ -91,7 +103,7 @@ send_virtio() {
   log "VM → HOST: $1"
 }
 
-wait_for_dir() {
+wait_for_mount() {
   # Block until a filesystem is actually mounted at the given path
   log "Waiting for mount at: $1"
   while ! mount | grep -q " $1 "; do
@@ -186,7 +198,7 @@ send_usb_size_gb() {
   [ "$size_gb" -lt 1 ] && size_gb=1
 
   log "Rounded size (GiB): $size_gb"
-  send_virtio "size_gb:${size_gb}" || log "WARN: failed to send size_gb message"
+  send_virtio "$size_gb" || log "WARN: failed to send size_gb message"
 }
 
 copy_real_to_vusb() {
@@ -244,7 +256,7 @@ while :; do
   # ----------------------------------------------------------
   # 1) Wait for REAL USB stick
   # ----------------------------------------------------------
-  wait_for_dir "$REAL_USB_MOUNT"
+  wait_for_mount "$REAL_USB_MOUNT"
   log "Real USB detected"
 
   # ----------------------------------------------------------
@@ -266,7 +278,7 @@ while :; do
     log "Scan failed, waiting for USB removal"
 
     # Debounce: wait until USB is removed
-    while [ -d "$REAL_USB_MOUNT" ]; do
+    while mount | grep -q " $REAL_USB_MOUNT "; do
       sleep "$POLL_SEC"
     done
     log "Real USB removed"
