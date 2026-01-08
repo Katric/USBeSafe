@@ -901,3 +901,36 @@ Device('/sys/devices/pci0000:00/0000:00:01.2/0000:02:00.0/usb1/1-3/1-3:1.1') con
   TYPE                : 0/0/0
   USEC_INITIALIZED    : 3668991661
 ```
+
+### Pi Pico BadUSB
+
+```
+T:  Bus=02 Lev=01 Prnt=01 Port=00 Cnt=01 Dev#=  2 Spd=12   MxCh= 0
+D:  Ver= 2.00 Cls=00(>ifc ) Sub=00 Prot=00 MxPS=64 #Cfgs=  1
+P:  Vendor=239a ProdID=80f4 Rev=01.00
+S:  Manufacturer=Raspberry Pi
+S:  Product=Pico
+S:  SerialNumber=5303284720824A1C
+C:  #Ifs= 6 Cfg#= 1 Atr=80 MxPwr=100mA
+I:  If#= 0 Alt=sh: invalid number ''
+ 0 #EPs= 1 Cls=02(commc) Sub=02 Prot=00 Driver=cdc_acm
+E:  Ad=81(I) Atr=03(Int.) MxPS=  64 Ivl=16ms
+I:  If#= 1 Alt=sh: invalid number ''
+ 0 #EPs= 2 Cls=0a(data ) Sub=00 Prot=00 Driver=cdc_acm
+E:  Ad=02(O) Atr=02(Bulk) MxPS=  64 Ivl=0ms
+E:  Ad=82(I) Atr=02(Bulk) MxPS=  64 Ivl=0ms
+I:  If#= 2 Alt=sh: invalid number ''
+ 0 #EPs= 2 Cls=08(stor.) Sub=06 Prot=50 Driver=usb-storage
+E:  Ad=03(O) Atr=02(Bulk) MxPS=  64 Ivl=0ms
+E:  Ad=83(I) Atr=02(Bulk) MxPS=  64 Ivl=0ms
+I:  If#= 3 Alt=sh: invalid number ''
+ 0 #EPs= 2 Cls=03(HID  ) Sub=00 Prot=00 Driver=usbhid
+E:  Ad=04(O) Atr=03(Int.) MxPS=  64 Ivl=8ms
+E:  Ad=84(I) Atr=03(Int.) MxPS=  64 Ivl=8ms
+I:  If#= 4 Alt=sh: invalid number ''
+ 0 #EPs= 0 Cls=01(audio) Sub=01 Prot=00 Driver=snd-usb-audio
+I:  If#= 5 Alt=sh: invalid number ''
+ 0 #EPs= 2 Cls=01(audio) Sub=03 Prot=00 Driver=snd-usb-audio
+E:  Ad=05(O) Atr=02(Bulk) MxPS=  64 Ivl=0ms
+E:  Ad=85(I) Atr=02(Bulk) MxPS=  64 Ivl=0ms
+```

@@ -243,4 +243,42 @@ What are the drawbacks?
 
 - not very convenient, but we could manually trigger driver probing after scans finished
 
+# How to find the device that has  to be scanned on the VM?
+
+The VM has 3 virtual USB Controllers by default with Product ID's of 1-3 by the vendor '1d6b' (Linux Foundation).
+Now that we don't pass the whole PCI USB Controller to the VM with all the connected devices but only the one that has
+to be scanned,
+it can be identified by looping over all USB Devices on the VM and skipping the USB Controllers mentioned above.
+
+![img.png](imgs/img_10.png)
+
+This image shows a keyboard that has been passed through to the VM. Next to the three USB COntrollers it's the only
+device
+present on the VM. The next step would be to identify the drivers it's loading.
+
+The planned approach looks like the following:
+If the "usb-hid" driver is loaded, e.g. for keyboards and other input devices, the bad usb scan should be performed.
+If the BadUSB scan fails, the host is notified via a FAIL message via the Virtio port.
+If the result is ok, we continue the search for the "usb-storage" driver.
+If it is loaded, the malware scan for usb devices is executed.
+If the result is ok, then an OK message is sent to the host via virtio. Additionally, we want to include a boolean flag,
+whether the device was a storage device or not, so the host can whitelist the device. If it is a storage device, it
+should not be whitelisted,
+because its contents should be scanned every time before being handed over to the user.
+
+Noticed: When device is passed authorized to VM and returns, drivers are loaded even if autoprobing is off! Solution:
+Set authorized = 0 before passing back the device in the VM! This way the device comes back with authorized = 0 to the
+host and drivers are not loaded.
+
+Next step for the host would be to set drivers_autoprobing to 1 again and set authorize to 1 and the device is ready to
+use.
+
+It is not easy to identify a Keyboard via its drivers. Taking per se all "usb-hid" devices could be too much.
+E.g. some headsets load hid too, because they have buttons. Some lighting controller load HID too! But it does not have
+any buttons. How can we find out, whether a device is harmful?
+Maybe check for the presence of some keys in the keymaps? How can we find the keymaps?
+We can just check the device capabilities with the evdev python package.
+We can check if the device supports key events of type EV_KEY, which describes state changes of buttons
+etc https://docs.kernel.org/input/event-codes.html.
+
 
