@@ -9,6 +9,7 @@ from pathlib import Path
 import pyudev
 from pyudev import Monitor, Context
 
+import popup
 from vusb import VirtualUSBStick
 from popup import show_delete_vusb_popup, show_scan_popup, StatusWindow
 import manage_usb_ids
@@ -65,7 +66,7 @@ def check_system_deps():
 #                      Disable Auto-Mount
 # ============================================================
 
-def disable_udisks2_service():
+def disable_udisks2_service(is_bad_usb_protection_active: bool):
     """
     Masks and stops udisks2.service to disable auto-mount.
     """
@@ -285,7 +286,7 @@ def restore_autoprobe():
     set_global_autoprobe(True)
 
 
-def handle_add_usb():
+def handle_add_usb(is_bad_usb_protection_active: bool):
     """
     Listens to ADD udev events and reads the following properties:
     - VID
@@ -330,11 +331,17 @@ def handle_add_usb():
         safe_authorize_device(device.sys_path)
 
         # --- VID/PID extraction ---
-        vid = device.get('ID_VENDOR_ID')
-        pid = device.get('ID_MODEL_ID')
-        serial = device.get('ID_SERIAL_SHORT', None)
+        vid = device.get('ID_VENDOR_ID', None)
+        pid = device.get('ID_MODEL_ID', None)
+        serial = device.get('ID_SERIAL_SHORT', device.get('ID_SERIAL', None))
         # TODO get usb storage size
 
+        if vid is None or pid is None:
+            print("[Warning] Cannot identify usb device")
+            print("[Warning] Device does not provide a vendor id and / or a product id. Skipping.")
+            continue
+
+        # Extract human-readable vendor and product names from vid and pid
         vendor_name, product_name = manage_usb_ids.get_vendor_and_product_names(device)
 
         # Wait briefly for kernel to finish setting up children
@@ -357,39 +364,83 @@ def handle_add_usb():
         print(f"  Is mass storage   : {is_mass_storage}")
         print("-" * 40)
 
-        if not is_mass_storage:
-            print("Not a mass storage device. Skipping.")
-            continue
-
-        # ---------------- popup you already implemented ----------------
         device_info = {"vid": vid, "vendor_name": vendor_name, "pid": pid, "product_name": product_name,
                        "serial": serial}
 
-        if not show_scan_popup(device_info):
-            print("🚫 Scan cancelled by user")
-            continue
+        # ########################################
+        # ########## BAD_USB_PROTECTION ##########
+        # ########################################
 
-        # load usbesafe config file and extract necessary keys
-        usbesafe_config = check_and_load_bad_usb_config.load_usbesafe_config()
-        is_bad_usb_protection_active: bool = usbesafe_config.get(check_and_load_bad_usb_config.BAD_USB_PROTECTION, 0)
+        if is_bad_usb_protection_active:
+            # hash usb device and register it on the whitelist (as wished by the user)
+            device_hash_for_whitelisting = manage_usb_ids.get_hashed_device_attributes(device)
+            is_on_whitelist = manage_usb_ids.is_device_whitelisted(device_hash_for_whitelisting)
+            if is_on_whitelist:
+                print("[Info] Device is present on the whitelist.")
 
-        # ---------------- Status Popup ----------------
-        status_window = StatusWindow(device_info)
-        status_window.start()
-        status_window.update("Building VM configuration...")
+                # If 'is_mass_storage'      ->  forwarding usb stick to VM without asking the user
+                # Else 'not a mass storage' ->  usb device will be authorized immediately (e.g. a keyboard was detected)
+                if is_mass_storage:
+                    print("[Info] Device is identified as a flash drive. Forwarding usb device to VM...")
+                    try:
+                        status_window.update("Preparing VM overlay and starting headless VM...")
 
-        try:
-            status_window.update("Preparing VM overlay and starting headless VM...")
+                        # --- Full Script 3 Logic (overlay + virtio + QMP) ---
+                        run_prod_scan(vid, pid, status_window)
 
-            # --- Full Script 3 Logic (overlay + virtio + QMP) ---
-            run_prod_scan(vid, pid, status_window)
+                    except Exception as e:
+                        status_window.update(f"Error: {str(e)}")
+                        print(f"[ERROR] Exception during VM scan: {e}")
+                        time.sleep(3)
+                        status_window.close()
+                        raise
 
-        except Exception as e:
-            status_window.update(f"Error: {str(e)}")
-            print(f"[ERROR] Exception during VM scan: {e}")
-            time.sleep(3)
-            status_window.close()
-            raise
+                else:
+                    print("[Info] Device is NOT identified as a flash drive. USB Device will be authorized...")
+                    # TODO: authorize usb device to host pc
+
+            else:
+                print("[Warning] Device is NOT present on the whitelist and needs to be scanned.")
+                # If 'scan'         ->  pass PCI Controller to VM
+                # Else 'don't scan' ->  reject USB device and let it stay unauthorized
+                if not popup.show_whitelist_popup(device_info):
+                    print("🚫 Scan cancelled by user")
+                    continue
+                else:
+                    print("[Info] Scan accepted. PCI Controller will be passed to VM for secure scanning...")
+                    # TODO: implement forwarding PCI controller to VM
+
+                # manage_usb_ids.add_to_whitelist_file(device_hash_for_whitelisting)    # <-- registers an usb stick to the whitelist
+
+        else:
+            # if usb-protection is turned off
+
+            if not is_mass_storage:
+                print("Not a mass storage device. Skipping.")
+                continue
+
+            # ---------------- popup you already implemented ----------------
+            if not show_scan_popup(device_info):
+                print("🚫 Scan cancelled by user")
+                continue
+
+            # ---------------- Status Popup ----------------
+            status_window = StatusWindow(device_info)
+            status_window.start()
+            status_window.update("Building VM configuration...")
+
+            try:
+                status_window.update("Preparing VM overlay and starting headless VM...")
+
+                # --- Full Script 3 Logic (overlay + virtio + QMP) ---
+                run_prod_scan(vid, pid, status_window)
+
+            except Exception as e:
+                status_window.update(f"Error: {str(e)}")
+                print(f"[ERROR] Exception during VM scan: {e}")
+                time.sleep(3)
+                status_window.close()
+                raise
 
 
 # ============================================================
@@ -421,8 +472,15 @@ def run_prod_scan(vid, pid, status_window):
 
     if result == "ok":
         status_window.update("Scan clean, waiting for copy…")
-        # TODO enter real usb size here
-        vUSB = VirtualUSBStick(image_path=VUSB_IMMAGE, size_mb=64, qmp_socket=QMP_SOCKET, device_id="vusb1")
+        # ---------------- SECOND MESSAGE (USB SIZE) ----------------
+        real_usb_size_gb = wait_for_virtio()
+        if not real_usb_size_gb.isdigit():
+            status_window.update("Error: Invalid USB size received from VM.")
+            kill_vm(vm)
+            cleanup_overlay()
+            return
+        status_window.update(f"Preparing vUSB of size {real_usb_size_gb} GB...")
+        vUSB = VirtualUSBStick(image_path=VUSB_IMMAGE, size_mb=int(real_usb_size_gb) * 1024, qmp_socket=QMP_SOCKET, device_id="vusb")
         try:
             vUSB.create(filesystem='vfat', label='USBeSafe')
             vUSB.attach_to_vm()
@@ -459,6 +517,13 @@ def run_prod_scan(vid, pid, status_window):
     cleanup_overlay()
 
 
+def is_bad_usb_protection_active() -> bool:
+    # load usbesafe config file and extract necessary keys
+    usbesafe_config = check_and_load_bad_usb_config.load_usbesafe_config()
+    is_active: bool = usbesafe_config.get(check_and_load_bad_usb_config.BAD_USB_PROTECTION, 0)
+    return is_active
+
+
 # ============================================================
 #                       MAIN
 # ============================================================
@@ -470,8 +535,9 @@ def main():
     if not check_system_deps():
         return
 
-    disable_udisks2_service()  # disable and mask udisks2 to disable automount
-    handle_add_usb()
+    is_protection_active: bool = is_bad_usb_protection_active()
+    disable_udisks2_service(is_protection_active)  # disable and mask udisks2 to disable automount
+    handle_add_usb(is_protection_active)
 
 
 if __name__ == "__main__":

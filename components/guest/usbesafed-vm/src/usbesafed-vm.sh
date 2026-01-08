@@ -1,58 +1,304 @@
 #!/bin/sh
+set -eu
 
-# Pfade anpassen falls nötig
-USB_REAL="/mnt/realusb"
-USB_VIRTUAL="/mnt/virtusb"
-VIRTIO_PORT="/dev/virtio-ports/securepass"
+# ============================================================
+# USBeSafe VM Daemon (Guest-Side)
+# ============================================================
+#
+# GUEST RESPONSIBILITIES (HIGH-LEVEL OVERVIEW)
+#
+# 1. Wait until a REAL USB stick becomes visible inside the VM
+#    (mounted at a predefined path).
+#
+# 2. Automatically run a malware scan on the REAL USB stick.
+#
+# 3. If the scan FAILS:
+#      - Send "fail" to the host via virtio
+#      - Do nothing else (host will destroy VM + overlay)
+#
+# 4. If the scan SUCCEEDS:
+#      - Calculate the USED size of the REAL USB stick
+#      - Round the size UP to full GiB units
+#      - Send "size_gb:<N>" to the host via virtio
+#        (Host uses this to create a fitting virtual USB stick)
+#      - Send "ok" to the host
+#
+# 5. Wait until the host attaches a VIRTUAL USB stick (via QMP)
+#    and it becomes mounted inside the VM.
+#
+# 6. Copy all data from REAL USB → VIRTUAL USB.
+#
+# 7. Send "copy_done" to the host via virtio.
+#
+# 8. Wait until both USBs are removed to avoid re-triggering.
+#
+# IMPORTANT:
+# - This daemon NEVER:
+#     * creates USB devices
+#     * attaches USB devices
+#     * deletes overlays
+#     * shuts down the VM
+# - The host is the single authority for lifecycle control.
+#
+# ============================================================
+
+
+# -----------------------------
+# Placeholder paths (adjust later)
+# -----------------------------
+
+# Mount point of the real, physical USB stick inside the VM
+REAL_USB_MOUNT="/mnt/realusb"
+
+# Mount point of the virtual USB stick created by the host
+VUSB_MOUNT="/mnt/vusb"
+
+# Virtio serial port created by QEMU (name=com.securepass.comm)
+VIRTIO_PORT="/dev/virtio-ports/com.securepass.comm"
+
+# Placeholder scanner script (actual logic lives there)
+SCANNER_CMD="/opt/scanner/scanner.py"
+
+# Polling interval in seconds
+POLL_SEC=1
+
+
+# -----------------------------
+# Helper functions
+# -----------------------------
 
 log() {
-    echo "[DAEMON] $1"
+  # Log to stderr so logs don't interfere with virtio output
+  echo "[usbesafed-vm] $*" >&2
 }
 
-send_msg() {
-    echo "$1" > "$VIRTIO_PORT"
-    log "→ HOST: $1"
+send_virtio() {
+  # Send a single line message to the host via virtio
+  # This is the ONLY communication channel VM → Host
+  if [ ! -e "$VIRTIO_PORT" ]; then
+    log "ERROR: virtio port not found: $VIRTIO_PORT"
+    return 1
+  fi
+
+  # Try to send; if it fails, log the error
+  if ! printf "%s\n" "$1" > "$VIRTIO_PORT"; then
+    log "ERROR: failed to write to virtio port: $VIRTIO_PORT"
+    return 1
+  fi
+
+  log "VM → HOST: $1"
 }
 
-log "Starte VM-Daemon..."
-log "Warte auf USB-Device im Pfad: $USB_REAL"
+wait_for_dir() {
+  # Block until a directory exists
+  # Used for detecting USB mount points
+  log "Waiting for directory: $1"
+  while [ ! -d "$1" ]; do
+    sleep "$POLL_SEC"
+  done
+  log "Directory available: $1"
+}
 
-# Warten bis echter USB-Stick erscheint
-while [ ! -d "$USB_REAL" ] || [ -z "$(ls -A "$USB_REAL" 2>/dev/null)" ]; do
-    sleep 1
+run_scan() {
+  # Placeholder scan invocation
+  #
+  # Expected semantics:
+  #   return 0 → scan OK
+  #   return 1 → scan FAIL
+  #
+  # Actual scanning logic lives in scanner.py
+
+  log "Starting scan. USB mount: $REAL_USB_MOUNT"
+  if [ ! -d "$REAL_USB_MOUNT" ]; then
+    log "WARN: REAL_USB_MOUNT is not a directory (yet?): $REAL_USB_MOUNT"
+  fi
+
+  if [ -f "$SCANNER_CMD" ]; then
+    log "Scanner script found: $SCANNER_CMD"
+
+    if command -v python3 >/dev/null 2>&1; then
+      log "python3 found. Executing scanner..."
+      python3 "$SCANNER_CMD" "$REAL_USB_MOUNT"
+      rc=$?
+      log "Scanner finished with exit code: $rc"
+      return $rc
+    fi
+
+    log "WARN: python3 not found. Trying to execute scanner directly..."
+    "$SCANNER_CMD" "$REAL_USB_MOUNT"
+    rc=$?
+    log "Scanner finished with exit code: $rc"
+    return $rc
+  fi
+
+  # Scanner missing is a hard failure (fail closed)
+  log "ERROR: Scanner missing at $SCANNER_CMD -> rejecting USB"
+  return 1
+}
+
+send_usb_size_gb() {
+  # Determine how much space is USED on the REAL USB stick
+  #
+  # Purpose:
+  #   Inform the host how large the virtual USB stick must be.
+  #   Host will round-create the virtual USB accordingly.
+  #
+  # Output format:
+  #   size_gb:<N>
+
+  log "Calculating USB used size for: $REAL_USB_MOUNT"
+
+  if ! command -v df >/dev/null 2>&1; then
+    log "ERROR: df not available. Cannot calculate USB size."
+    return 0
+  fi
+
+  if ! command -v awk >/dev/null 2>&1; then
+    log "ERROR: awk not available. Cannot parse df output."
+    return 0
+  fi
+
+  if ! used_kb="$(df -P "$REAL_USB_MOUNT" 2>/dev/null | awk 'NR==2 {print $3}')"; then
+    log "ERROR: df failed for mount: $REAL_USB_MOUNT"
+    return 0
+  fi
+
+  if [ -z "${used_kb:-}" ] || ! echo "$used_kb" | grep -Eq '^[0-9]+$'; then
+    log "ERROR: Could not parse used_kb from df output (got: '${used_kb:-}')"
+    log "DEBUG: df output:"
+    df -P "$REAL_USB_MOUNT" || true
+    return 0
+  fi
+
+  log "Used space (df): ${used_kb} KiB"
+
+  # Convert to bytes
+  used_bytes=$(( used_kb * 1024 ))
+
+  # One GiB in bytes
+  gib=$(( 1024 * 1024 * 1024 ))
+
+  # Ceiling division: round UP to full GiB
+  size_gb=$(( (used_bytes + gib - 1) / gib ))
+
+  # Safety: minimum size is 1 GiB
+  [ "$size_gb" -lt 1 ] && size_gb=1
+
+  log "Rounded size (GiB): $size_gb"
+  send_virtio "size_gb:${size_gb}" || log "WARN: failed to send size_gb message"
+}
+
+copy_real_to_vusb() {
+  # Copy all contents from REAL USB → VIRTUAL USB
+  #
+  # -a preserves attributes and directories
+
+  log "Starting copy: $REAL_USB_MOUNT -> $VUSB_MOUNT"
+
+  if [ ! -d "$REAL_USB_MOUNT" ]; then
+    log "ERROR: real USB mount directory missing: $REAL_USB_MOUNT"
+    return 1
+  fi
+
+  if [ ! -d "$VUSB_MOUNT" ]; then
+    log "ERROR: virtual USB mount directory missing: $VUSB_MOUNT"
+    return 1
+  fi
+
+  # Optional debug: show a quick listing (can be noisy, but helpful)
+  log "DEBUG: real USB content (top-level):"
+  ls -la "$REAL_USB_MOUNT" 2>/dev/null | head -n 30 || true
+
+  if cp -a "$REAL_USB_MOUNT"/. "$VUSB_MOUNT"/; then
+    log "Copy completed successfully"
+    return 0
+  fi
+
+  log "ERROR: copy failed (cp returned non-zero)"
+  return 1
+}
+
+
+# ============================================================
+# Main Daemon Loop
+# ============================================================
+
+# Wait until QEMU exposes the virtio serial port
+log "Daemon boot: waiting for virtio port $VIRTIO_PORT"
+while [ ! -e "$VIRTIO_PORT" ]; do
+  log "Still waiting for virtio port: $VIRTIO_PORT"
+  sleep "$POLL_SEC"
 done
+log "Virtio port detected: $VIRTIO_PORT"
 
-log "USB erkannt! Starte Scan... (Scanlogik extern/angepasst)"
-# --------------------------------------------------------------
-# Hier würde normalerweise der Virenscan laufen.
-# Wir simulieren ihn nur durch ein externes Ergebnis.
-# --------------------------------------------------------------
+# Startup banner with current config
+log "Daemon started"
+log "Config: REAL_USB_MOUNT=$REAL_USB_MOUNT"
+log "Config: VUSB_MOUNT=$VUSB_MOUNT"
+log "Config: VIRTIO_PORT=$VIRTIO_PORT"
+log "Config: SCANNER_CMD=$SCANNER_CMD"
+log "Config: POLL_SEC=$POLL_SEC"
 
-# Beispiel: Ergebnisdatei prüfen (ersetze später durch echten Scan)
-SCAN_RESULT_FILE="$USB_REAL/result.txt"
+while :; do
+  # ----------------------------------------------------------
+  # 1) Wait for REAL USB stick
+  # ----------------------------------------------------------
+  wait_for_dir "$REAL_USB_MOUNT"
+  log "Real USB detected"
 
-if [ -f "$SCAN_RESULT_FILE" ] && grep -q "fail" "$SCAN_RESULT_FILE"; then
-    send_msg "fail"
-    log "Scan ergab FAIL, beende."
-    exit 0
-fi
+  # ----------------------------------------------------------
+  # 2) Run malware scan
+  # ----------------------------------------------------------
+  if run_scan; then
+    # ------------------------------------------------------
+    # 3a) Scan OK
+    # ------------------------------------------------------
+    log "Scan result: OK"
+    send_virtio "ok"     # positive scan result
+    send_usb_size_gb     # inform host about required vUSB size
+  else
+    # ------------------------------------------------------
+    # 3b) Scan FAIL
+    # ------------------------------------------------------
+    log "Scan result: FAIL"
+    send_virtio "fail"
+    log "Scan failed, waiting for USB removal"
 
-# Standard: Erfolg
-send_msg "ok"
-log "Scan war OK, warte auf virtuellen USB-Stick..."
+    # Debounce: wait until USB is removed
+    while [ -d "$REAL_USB_MOUNT" ]; do
+      sleep "$POLL_SEC"
+    done
+    log "Real USB removed"
+    continue
+  fi
 
-# Warten auf virtuellen USB-Stick
-while [ ! -d "$USB_VIRTUAL" ] || [ -z "$(ls -A "$USB_VIRTUAL" 2>/dev/null)" ]; do
-    sleep 1
+  # ----------------------------------------------------------
+  # 4) Wait for VIRTUAL USB stick (host attaches via QMP)
+  # ----------------------------------------------------------
+  while [ ! -d "$VUSB_MOUNT" ]; do
+    if ! mount -t vfat /dev/disk/by-label/USBeSafe "$VUSB_MOUNT" 2>/dev/null; then
+      sleep "$POLL_SEC"
+    fi
+  done
+  log "Virtual USB detected"
+
+  # ----------------------------------------------------------
+  # 5) Copy data
+  # ----------------------------------------------------------
+  if copy_real_to_vusb; then
+    send_virtio "copy_done"
+  else
+    # Copy failing is important to see on the host.
+    # We still log here; you can later decide if you want an explicit protocol message.
+    log "ERROR: Copy failed. (Host-side reaction TBD)"
+  fi
+
+  # ----------------------------------------------------------
+  # 6) Debounce until both USBs are removed
+  # ----------------------------------------------------------
+  log "Copy finished, waiting for USB removal"
+  while [ -d "$REAL_USB_MOUNT" ] || [ -d "$VUSB_MOUNT" ]; do
+    sleep "$POLL_SEC"
+  done
+  log "USBs removed, returning to idle state"
 done
-
-log "Virtueller USB-Stick erkannt: $USB_VIRTUAL"
-log "Kopiere Dateien..."
-
-cp -r "$USB_REAL"/* "$USB_VIRTUAL"/
-
-log "Kopieren abgeschlossen."
-send_msg "copy_done"
-
-log "Daemon beendet."
-exit 0

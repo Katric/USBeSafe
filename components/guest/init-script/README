@@ -1,0 +1,42 @@
+# SecurePass VM Install Script
+
+This document describes how to install and run the SecurePass VM initialization script.
+
+## Purpose
+- Installs ClamAV
+- Enables root autologin on tty1
+- Must be run **once** as root inside the Alpine VM
+
+---
+
+## Steps
+
+### 1. Copy the provided init script
+Use **the script from the previous message** (do not modify it).
+
+### 2. Create the file
+```sh
+cd /usr/local/sbin
+vi securepass-init.sh
+```
+
+Paste the script, then save and exit.
+
+### 3. Make it executable
+```sh
+chmod +x /usr/local/sbin/securepass-init.sh
+```
+
+### 4. Run once
+```sh
+/usr/local/sbin/securepass-init.sh
+```
+
+---
+
+## Result
+- Root autologin enabled on tty1
+- ClamAV installed and ready
+- VM prepared for SecurePass usage
+
+Do **not** run the script again unless you know what you are doing.

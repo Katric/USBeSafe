@@ -26,7 +26,8 @@ def run_vm_dev():
 
     if os.path.exists(QMP_SOCKET):
         os.remove(QMP_SOCKET)
-        
+
+
     qemu_cmd = [
         "qemu-system-x86_64",
         "-m", "2048",
@@ -34,14 +35,19 @@ def run_vm_dev():
         "-drive", f"file={BASE_IMAGE},format=qcow2",
         "-net", "nic",
         "-net", "user",
-        "-vnc", ":1",            # VNC auf Port 5901
-        "-display", "sdl",       # GUI Fenstern
+        #"-vnc", ":1",            # VNC auf Port 5901
+        #"-display", "sdl",       # GUI Fenstern
+
+        "-nographic",
+        "-serial", "mon:stdio",
+
         "-usb",                  # Enable USB
         "-device", "usb-ehci,id=ehci",  # USB 2.0 controller
         # --- QMP channel ---
         "-qmp", f"unix:{QMP_SOCKET},server,nowait",
+
     ]
-    
+
     if kvm_available:
         qemu_cmd.insert(1, "-enable-kvm")
         print("[INFO] KVM acceleration enabled")
@@ -52,6 +58,7 @@ def run_vm_dev():
     print(" ".join(qemu_cmd))
 
     subprocess.run(qemu_cmd)
+
 
 if __name__ == "__main__":
     run_vm_dev()
