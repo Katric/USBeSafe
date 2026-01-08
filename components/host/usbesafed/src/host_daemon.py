@@ -474,7 +474,7 @@ def handle_add_usb(is_bad_usb_protection_active: bool):
                 continue
 
             print("[Info] Scan accepted by user (or auto-timeout). Device will be passed to VM for secure scanning...")
-            # TODO: implement forwarding PCI controller to VM
+
             # deactivate device_autoprobe and then authorize this device
             safe_authorize_device(device.sys_path)
 
@@ -485,7 +485,7 @@ def handle_add_usb(is_bad_usb_protection_active: bool):
                 status_window.update("Preparing VM overlay and starting headless VM...")
 
                 # --- Full Script 3 Logic (overlay + virtio + QMP) ---
-                run_prod_scan(vid, pid, status_window)
+                run_prod_scan(vid, pid, status_window, device_hash_for_whitelisting)
 
             except Exception as e:
                 status_window.update(f"Error: {str(e)}")
@@ -494,13 +494,12 @@ def handle_add_usb(is_bad_usb_protection_active: bool):
                 status_window.close()
                 raise
 
-            # manage_usb_ids.add_to_whitelist_file(device_hash_for_whitelisting)    # <-- registers an usb stick to the whitelist
 
 # ============================================================
 #                       USB LOGIC
 # ============================================================
 
-def run_prod_scan(vid, pid, status_window):
+def run_prod_scan(vid, pid, status_window, device_hash: str):
     """
     Runs the ENTIRE Script 3 logic:
     - Overlay creation
@@ -515,23 +514,28 @@ def run_prod_scan(vid, pid, status_window):
     vm = start_vm(vid, pid)
 
     # ---------------- FIRST MESSAGE (OK or FAIL) ----------------
-    result = wait_for_virtio()
+    # will be in format "ok,True", "ok,False", "fail"
+    result, is_mass_storage = wait_for_virtio().strip().split(',')
 
     if result == "fail":
         status_window.update("Scan FAILED, malware detected!")
-        kill_vm(vm)
-        cleanup_overlay()
+        kill_vm_and_cleanup_overlay(vm)
         return
 
     if result == "ok":
+        # usb device is safe. Register it on the whitelist if it is NOT a mass storage device
+        if is_mass_storage == "False":
+            print("[Info] Device will be added to whitelist...")
+            manage_usb_ids.add_to_whitelist_file(device_hash)
+
         status_window.update("Scan clean, waiting for copy…")
         # ---------------- SECOND MESSAGE (USB SIZE) ----------------
         real_usb_size_gb = wait_for_virtio()
         if not real_usb_size_gb.isdigit():
             status_window.update("Error: Invalid USB size received from VM.")
-            kill_vm(vm)
-            cleanup_overlay()
+            kill_vm_and_cleanup_overlay(vm)
             return
+
         status_window.update(f"Preparing vUSB of size {real_usb_size_gb} GB...")
         vUSB = VirtualUSBStick(image_path=VUSB_IMMAGE, size_mb=int(real_usb_size_gb) * 1024, qmp_socket=QMP_SOCKET,
                                device_id="vusb")
@@ -567,8 +571,17 @@ def run_prod_scan(vid, pid, status_window):
 
     # unknown
     status_window.update("Unknown VM message.")
+    time.sleep(3)
+    status_window.update("Shutting down VM...")
+    kill_vm_and_cleanup_overlay(vm)
+    return
+
+
+def kill_vm_and_cleanup_overlay(vm):
     kill_vm(vm)
+    print("[INFO] Success, cleaning up...")
     cleanup_overlay()
+    print("[INFO] Done")
 
 
 def is_bad_usb_protection_active() -> bool:
