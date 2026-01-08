@@ -155,7 +155,7 @@ def start_vm(vid, pid):
 
             # --- QMP channel ---
             "-qmp", f"unix:{QMP_SOCKET},server,nowait",
-            "-usb", # Enable USB
+            "-usb",  # Enable USB
             # --- USB passthrough (real hardware) ---
             "-device", "qemu-xhci,id=xhci",
             "-device", f"driver=usb-host,bus=xhci.0,vendorid=0x{vid},productid=0x{pid}"
@@ -238,6 +238,48 @@ def cleanup_overlay():
 #                    EXISTING USB LISTENER
 # ============================================================
 
+def set_usb_autoprobe(enabled: bool):
+    """Activates or deactivates driver_autoprobe"""
+    try:
+        val = "1" if enabled else "0"
+        with open("/sys/bus/usb/drivers_autoprobe", "w") as f:
+            f.write(val)
+    except Exception as e:
+        print(f"[ERROR] Could not set driver_autoprobe: {e}")
+
+
+def safe_authorize_device(device_sys_path):
+    """
+    Authorizes the device but deactivaets driver_autoprobe before, so no drivers are loaded on the host.
+    Also sets bConfigurationValue of this device to 1.
+    """
+    print(f"Deactivating driver_autoprobe globally and authorizing device: {device_sys_path}")
+    set_usb_autoprobe(False)
+    try:
+        auth_path = os.path.join(device_sys_path, "authorized")
+        with open(auth_path, "w") as f:
+            f.write("1")
+        time.sleep(0.5)  # wait a little
+    except Exception as e:
+        print(f"Error during authorization: {e} Reactivating driver_autoprobe.")
+        set_usb_autoprobe(True)
+        return False
+
+    try:
+        config_path = os.path.join(device_sys_path, "bConfigurationValue")
+
+        with open(config_path, "w") as f:
+            f.write("1")
+
+        print(f"Device {device_sys_path} configured (Active Config=1)")
+        time.sleep(0.5)  # wait a little
+    except Exception as e:
+        print(f"ERROR: Could not set configuration: {e}")
+        return False
+
+    return True
+
+
 def handle_add_usb(is_bad_usb_protection_active: bool):
     """
     Listens to ADD udev events and reads the following properties:
@@ -277,6 +319,11 @@ def handle_add_usb(is_bad_usb_protection_active: bool):
             print(f"Device type is {device.get('DEVTYPE')}. Skipping.")
             continue
 
+        print(f"🔒 Sicheres Aufwecken von {device.device_path}...")
+
+        # deactivate device_autoprobe and then authorize this device
+        safe_authorize_device(device.sys_path)
+
         # --- VID/PID extraction ---
         vid = device.get('ID_VENDOR_ID', None)
         pid = device.get('ID_MODEL_ID', None)
@@ -295,7 +342,7 @@ def handle_add_usb(is_bad_usb_protection_active: bool):
         time.sleep(2)
 
         # --- Check if USB-storage interface exists ---
-        is_mass_storage = False
+        is_mass_storage = True
         for child in device.children:
             if (child.get('DEVTYPE') == 'usb_interface' and
                     child.get('DRIVER') == 'usb-storage'):
@@ -427,7 +474,8 @@ def run_prod_scan(vid, pid, status_window):
             cleanup_overlay()
             return
         status_window.update(f"Preparing vUSB of size {real_usb_size_gb} GB...")
-        vUSB = VirtualUSBStick(image_path=VUSB_IMMAGE, size_mb=int(real_usb_size_gb) * 1024, qmp_socket=QMP_SOCKET, device_id="vusb")
+        vUSB = VirtualUSBStick(image_path=VUSB_IMMAGE, size_mb=int(real_usb_size_gb) * 1024, qmp_socket=QMP_SOCKET,
+                               device_id="vusb")
         try:
             vUSB.create(filesystem='vfat', label='USBeSafe')
             vUSB.attach_to_vm()
