@@ -3,7 +3,16 @@ import logging
 import sys
 import os
 
-SCAN_DIR = "/your/directory" #TODO: add scan dir
+if len(sys.argv) != 2:
+    logger.error("Usage: %s <scan_directory>", sys.argv[0])
+    sys.exit(2)
+
+SCAN_DIR = sys.argv[1]
+
+if not os.path.isdir(SCAN_DIR):
+    logger.error("Scan directory does not exist or is not a directory: %s", SCAN_DIR)
+    sys.exit(2)
+
 
 LOG_FILE = "/var/log/clamav-wrapper.log"
 FRESHCLAM_CONFIG = "/etc/clamav/freshclam.conf"
@@ -91,7 +100,9 @@ if __name__ == "__main__":
     logger.info("Script started")
 
     run_freshclam()
-    result = run_scan()
+    infected = run_scan()
 
-    print("true" if result else "false")
+    # Exit codes expected by the VM daemon:
+    # 0 = clean, 1 = infected, 2 = scanner error
+    sys.exit(1 if infected else 0)
 

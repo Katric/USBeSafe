@@ -62,6 +62,8 @@ SCANNER_CMD="/opt/scanner/scanner.py"
 # Polling interval in seconds
 POLL_SEC=1
 
+# Create the mount point directories (if missing)
+mkdir -p "$REAL_USB_MOUNT" "$VUSB_MOUNT"
 
 # -----------------------------
 # Helper functions
@@ -275,12 +277,13 @@ while :; do
   # ----------------------------------------------------------
   # 4) Wait for VIRTUAL USB stick (host attaches via QMP)
   # ----------------------------------------------------------
-  while [ ! -d "$VUSB_MOUNT" ]; do
-    if ! mount -t vfat /dev/disk/by-label/USBeSafe "$VUSB_MOUNT" 2>/dev/null; then
-      sleep "$POLL_SEC"
-    fi
+  # Wait until the vUSB is actually mounted at $VUSB_MOUNT
+  # (Directory existence is not enough; /mnt/vusb usually exists already)
+  while ! mount | grep -q " $VUSB_MOUNT "; do
+    mount -t vfat /dev/disk/by-label/USBeSafe "$VUSB_MOUNT" 2>/dev/null || true
+    sleep "$POLL_SEC"
   done
-  log "Virtual USB detected"
+  log "Virtual USB mounted and ready"
 
   # ----------------------------------------------------------
   # 5) Copy data
@@ -297,7 +300,7 @@ while :; do
   # 6) Debounce until both USBs are removed
   # ----------------------------------------------------------
   log "Copy finished, waiting for USB removal"
-  while [ -d "$REAL_USB_MOUNT" ] || [ -d "$VUSB_MOUNT" ]; do
+  while mount | grep -q " $REAL_USB_MOUNT " || mount | grep -q " $VUSB_MOUNT "; do
     sleep "$POLL_SEC"
   done
   log "USBs removed, returning to idle state"

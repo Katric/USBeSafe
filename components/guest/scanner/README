@@ -1,0 +1,5 @@
+# Malware Scanner
+
+
+## Setup
+Copy the scanner.py file into the VM (opt/scanner/scanner.py)
