@@ -531,7 +531,8 @@ def run_prod_scan(vid, pid, status_window, usb_device, device_hash: str):
             print("[Info] Device will be added to whitelist...")
             manage_usb_ids.add_to_whitelist_file(device_hash)
 
-        # TODO: drivers_autoprobing = 1, authorized = 1
+        set_usb_autoprobe(True)
+        set_authorize_device(usb_device.sys_path, True)
 
         status_window.update("Scan clean, waiting for copy…")
         # ---------------- SECOND MESSAGE (USB SIZE) ----------------
