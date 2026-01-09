@@ -357,7 +357,7 @@ def safe_authorize_device(device_sys_path):
     """
     print(f"[INFO] Deactivating driver_autoprobe globally and authorizing device: {device_sys_path}")
     set_usb_autoprobe(False)
-    if set_authorize_device(device_sys_path,True):
+    if set_authorize_device(device_sys_path, True):
         time.sleep(0.5)  # wait a little
     else:
         print("Reactivating driver_autoprobe...")
