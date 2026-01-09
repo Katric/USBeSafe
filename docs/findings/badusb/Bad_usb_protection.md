@@ -281,4 +281,35 @@ We can just check the device capabilities with the evdev python package.
 We can check if the device supports key events of type EV_KEY, which describes state changes of buttons
 etc https://docs.kernel.org/input/event-codes.html.
 
+Testing the capabilities of the BadUSB Stick: it has EV_KEY!
+
+But also Headsets have EV_KEY: e.g. KEY_VOLUMEUP.
+My next approach would be to filter if the device supports potentially "dangerous" keys, as EV_KEYS supports
+contains many keys like KEY_A, KEY_0 or KEY_SPACE. The approach now is to scan whether the device supports any keys
+between
+KEY_A - KEY_Z, KEY_0 - KEY_9, and functional keys like KEY_ENTER.
+This could narrow down the amount of potentially dangerous devices that have to be checked and throws out HID devices
+that most likely are not dangerous.
+![img.png](imgs/img_11.png)
+![img_1.png](imgs/img_12.png)
+
+The headset still falls under the selection, because ALL the to be checked keys are supported, even though only
+KEY_VOLUMEUP
+and KEY_VOLUMEDOWN can actively be used by turning a volume wheel. As this is potential danger, we have to scan this
+device too!
+The modified Raspberry Pi BadUSB also supports all our relevant keys.
+
+The original approach was to first ask the user if he has just connected a Keyboard.
+If the user clicks yes, the device is scanned. If he clicks no, the device is immediately ejected.
+This is also done similarly by some anti virus programs but even they detect mice as keyboards.
+TODO make experiment with headset. Is it detected as keyboard too?!
+
+(ASK TIZIAN FOR ANTIVIRUS) Later some antivirus programs ask the user to type in a short numeric code on the device.
+As even they are not sure if it's really a keyboard, they provide the possibility to enter the code by clicking on
+numbers with the mouse. As we possible can't do the mouse approach as a fallback (e.g. when the user connects a new
+mouse), because the device is passed over to the VM and therefore is not usable on the host, we have to find another
+convenient way.
+
+
+
 

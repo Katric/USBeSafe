@@ -2,13 +2,23 @@ from select import select
 
 import evdev
 from evdev import ecodes, InputDevice
-from evdev.ecodes import EV_KEY, EV_REL
+from evdev.ecodes import *
+
+RELEVANT_KEYBOARD_KEYS = [KEY_A, KEY_B, KEY_C, KEY_D, KEY_E, KEY_F, KEY_G, KEY_H, KEY_I, KEY_J, KEY_L, KEY_M, KEY_N,
+                          KEY_O, KEY_P, KEY_Q, KEY_R, KEY_S, KEY_T, KEY_U, KEY_V, KEY_W, KEY_X, KEY_Y, KEY_Z,
+                          KEY_0, KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9,
+                          KEY_ENTER, KEY_ESC, KEY_BACKSPACE, KEY_SPACE, KEY_LEFTCTRL, KEY_LEFTALT, KEY_RIGHTCTRL,
+                          KEY_RIGHTALT, KEY_LEFTMETA, KEY_RIGHTMETA, KEY_LEFTSHIFT, KEY_RIGHTSHIFT, KEY_TAB, KEY_DOT,
+                          KEY_COMMA, KEY_SEMICOLON, KEY_SLASH, KEY_BACKSLASH]
 
 
 # Execute with sudo! otherwise can't list devices
 def main():
     vid = "1532"
     pid = "008a"
+
+    vid = "239a"
+    pid = "80f4"
 
     devices = get_ev_key_input_devices(vid, pid)
 
@@ -18,10 +28,7 @@ def main():
 
     devices = {dev.fd: dev for dev in devices}
 
-    iterations = 0
     while True:
-        iterations += 1
-        print("Iteration " + str(iterations))
         r, w, x = select(devices, [], [])
         for fd in r:
             for event in devices[fd].read():
@@ -40,18 +47,26 @@ def wait_for_input(devices: list[InputDevice], duration_seconds: int):
 
 
 def get_ev_key_input_devices(vid: str, pid: str) -> list[InputDevice]:
+    """
+    Returns real keyboard devices. Checks if the device supports any of the listed typical keyboard keys.
+    If yes, it has to be checked. If no, it has not to be checked.
+    An empty list means that it has not to be checked
+    """
     devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
-    key_input_devices: list[InputDevice] = []
 
     vid_int = int(vid, 16)
     pid_int = int(pid, 16)
 
-    print("EV_KEY is" + str(EV_KEY))
+    key_input_devices: list[InputDevice] = []
+
     for device in devices:
+        # find device matching the VID and PID
         if device.info.vendor == vid_int and device.info.product == pid_int:
             # if device can press buttons
             if EV_KEY in device.capabilities():
-                key_input_devices.append(device)
+                # check if the device supports any of the relevant keyboard keys
+                if any(key in set(device.capabilities()[EV_KEY]) for key in RELEVANT_KEYBOARD_KEYS):
+                    key_input_devices.append(device)
 
     return key_input_devices
 
