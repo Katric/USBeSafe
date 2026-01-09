@@ -531,6 +531,8 @@ def run_prod_scan(vid, pid, status_window, usb_device, device_hash: str):
         if is_mass_storage == "False":
             print("[Info] Device will be added to whitelist...")
             manage_usb_ids.add_to_whitelist_file(device_hash)
+        else:
+            print("[Info] Device was marked as a mass storage device and will not be added to the whitelist")
 
         set_usb_autoprobe(True)
         set_authorize_device(usb_device.sys_path, True)
