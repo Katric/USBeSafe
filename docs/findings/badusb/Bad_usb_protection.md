@@ -301,14 +301,59 @@ The modified Raspberry Pi BadUSB also supports all our relevant keys.
 
 The original approach was to first ask the user if he has just connected a Keyboard.
 If the user clicks yes, the device is scanned. If he clicks no, the device is immediately ejected.
-This is also done similarly by some anti virus programs but even they detect mice as keyboards.
-TODO make experiment with headset. Is it detected as keyboard too?!
+This is also done similarly by some anti virus programs like G Data on Windows.
+Here are some observations of the BadUSB Protection of G Data with some test devices:
 
-(ASK TIZIAN FOR ANTIVIRUS) Later some antivirus programs ask the user to type in a short numeric code on the device.
-As even they are not sure if it's really a keyboard, they provide the possibility to enter the code by clicking on
-numbers with the mouse. As we possible can't do the mouse approach as a fallback (e.g. when the user connects a new
-mouse), because the device is passed over to the VM and therefore is not usable on the host, we have to find another
-convenient way.
+- Keyboard:
+    - is detected -> pop up opens and says that a keyboard was connected. Accept or block?
+    - if click accept -> have to enter 4 digit code either by using ANOTHER keyboard or a mouse
+- Razer Mouse:
+    - Detected as keyboard too
+    - Fully usable, even thumb keys on the side (maybe it's the dpi switch?)
+- Funny part: Plugging in Pico BadUSB
+    - NOT detected as Keyboard and badusb firmware is executed! (youtube video is opened via terminal)
+    - Guess: G DATA recognized it as usb-storage device first... maybe they don't check for keyboards then?!
+    - after trying again with Pin GP1 and GND shorted to suppress the usb-storage driver, a keyboard is detected and the
+      payload is not executed
+- Headset
+    - detected as keyboard
+    - Sound works and VOLUMEUP and VOLUMEDOWN too
+    - after clicking on block the device is still available
+
+The idea with the challenge-response approach with the question whether it is a keyboard and by entering the 4 digit
+code is good, but can easily be circumvented and be annoying to the user.
+Unfortunately as seen with the headset, not every "real" device has the possiblity to enter digits even if its
+registered as its capabilities(like the headset).
+To still keep the protection as effective as possible this will be the approach:
+We will implement a Red-Light Green-Light game like in squid game.
+Show green light: user has to press any button on the device ONCE. (timeout between 4-8 seconds)
+If time runs out, the device is blocked.
+Then after the key is pressed at green light: show red light for 3-8 seconds
+if a key is pressed during red light -> device is immediately blocked
+This is repeated for 3-4 rounds.
+It can be circumvented potentially, but finding the perfect rythm is unlikely as the rounds can overlap because of the
+different time slots.
+If all tests are passed, the device is likely to be authorized.
+This has the advantage: Firmware with something like "wait for 15 minutes and then start the attack" won't work, because
+it's timing out.
+
+A potential danger comes from e.g. real devices that still have bad usb installed on them! but that is very unlikely.
+Worst case: Real device cant get authorized! Solution: Whitelist it manually.
+
+But back to the game: Now we found a way to precisely decide whether a device has keyboard capabilities and has to be
+checked or if it is just a "harmless" input device.
+
+Test with yubikey:
+
+- HID driver is loaded
+- sends 14 inputs when pressed
+- Could be whitelisted, but has no serial number which makes it easily spoofable.
+  How can we allow such devices?
+- Idea: Allow not only one input per green phase but set a max of like 50?
+- Only strictly don't allow inputs during red phase, but enforce min one at green.
+- random duration of phases
+- interactive CAPTCHA
+- not only checking if something is sent -> but also that NOTHING is sent
 
 
 
