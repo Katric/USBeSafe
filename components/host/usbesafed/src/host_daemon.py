@@ -518,11 +518,12 @@ def run_prod_scan(vid, pid, status_window, usb_device, device_hash: str):
     result, is_mass_storage = wait_for_virtio().strip().split(',')
 
     if result == "fail":
-        status_window.update("Scan FAILED, malware detected!")
+        status_window.update("Scan FAILED, malware detected! Ejecting usb device...")
         kill_vm_and_cleanup_overlay(vm)
         set_authorize_device(usb_device.sys_path, False)
         eject_usb_device(usb_device.sys_path)
         set_usb_autoprobe(True)
+        status_window.update("USB device successfully ejected")
         return
 
     if result == "ok":
