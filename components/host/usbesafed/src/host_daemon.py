@@ -485,7 +485,7 @@ def handle_add_usb(is_bad_usb_protection_active: bool):
                 status_window.update("Preparing VM overlay and starting headless VM...")
 
                 # --- Full Script 3 Logic (overlay + virtio + QMP) ---
-                run_prod_scan(vid, pid, status_window, device_hash_for_whitelisting)
+                run_prod_scan(vid, pid, status_window, device, device_hash_for_whitelisting)
 
             except Exception as e:
                 status_window.update(f"Error: {str(e)}")
@@ -499,7 +499,7 @@ def handle_add_usb(is_bad_usb_protection_active: bool):
 #                       USB LOGIC
 # ============================================================
 
-def run_prod_scan(vid, pid, status_window, device_hash: str):
+def run_prod_scan(vid, pid, status_window, usb_device, device_hash: str):
     """
     Runs the ENTIRE Script 3 logic:
     - Overlay creation
@@ -520,7 +520,9 @@ def run_prod_scan(vid, pid, status_window, device_hash: str):
     if result == "fail":
         status_window.update("Scan FAILED, malware detected!")
         kill_vm_and_cleanup_overlay(vm)
-        # TODO: authorized = 0, eject device, drivers_autoprobing = 1
+        set_authorize_device(usb_device.sys_path, False)
+        eject_usb_device(usb_device.sys_path)
+        set_usb_autoprobe(True)
         return
 
     if result == "ok":
@@ -578,6 +580,28 @@ def run_prod_scan(vid, pid, status_window, device_hash: str):
     status_window.update("Shutting down VM...")
     kill_vm_and_cleanup_overlay(vm)
     return
+
+
+def eject_usb_device(device_path):
+    """
+    Eject an usb device from the host system.
+    :param device_path: The device's system path.
+    """
+    try:
+        usb_bus_id = os.path.basename(device_path)
+        print(f"[INFO] Ejecting USB device from bus {usb_bus_id}...")
+        remove_file = f"/sys/bus/usb/devices/{usb_bus_id}/remove"
+        if os.path.exists(remove_file):
+            with open(remove_file, 'w') as f:
+                f.write('1')
+            print(f"[INFO] USB device {device_path} ejected successfully")
+        else:
+            print(f"[ERROR] Could not eject USB device at {remove_file}. Is the device still plugged in?")
+
+    except PermissionError:
+        print("[ERROR] You need sudo rights to eject USB device.")
+    except Exception as e:
+        print(f"[ERROR] Could not eject USB device {e}")
 
 
 def kill_vm_and_cleanup_overlay(vm):
