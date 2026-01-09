@@ -634,8 +634,9 @@ def main():
         return
 
     # ########## To Restore functionality xD ##########
-    # set_usb_default_authorization(True)
     # set_usb_autoprobe(True)
+    # set_usb_default_authorization(True)
+
     # # Disable 'authorized_default' values on all usb bus systems
     set_usb_default_authorization(False)
     is_protection_active: bool = is_bad_usb_protection_active()
