@@ -1,6 +1,6 @@
 #!/sbin/openrc-run
 
-command="/usr/local/bin/usbesafed-vm"
+command="/usr/local/bin/usbesafed-vm.sh"
 command_background="yes"
 pidfile="/run/usbesafed-vm.pid"
 

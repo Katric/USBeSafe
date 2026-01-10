@@ -50,7 +50,7 @@ The VM already contains all core components required for installation, virus sca
 
 ---
 
-### 4 `usbesafed-vm/src/usbesafed-vm.init`
+### 4 `usbesafed-vm/src/usbesafed-vm`
 **Purpose:** **OpenRC init script** for daemon management.
 
 **Responsibilities:**
@@ -66,22 +66,44 @@ The VM already contains all core components required for installation, virus sca
 
 ---
 
-### 5 `placeholder/placeholder/`
-**Purpose:**
+### 5 `usbesafed-vm/src/badusb/bad_usb_check.py`
+**Purpose:** Perform BadUSB checks on the VM
 
 **Responsibilities:**
+- Detect USB HID Devices with Keyboard Capabilities
+- Detect BadUSB devices which send malicious input
 
 **Role in the workflow:**
+- called by orchestrator.py on the VM  if USB device inside the VM has keyboard input capabilities
 
 **VM Path:**
-- /opt/scanner/placeholder.py
+- /opt/scanner/bad_usb_check.py
+
+---
+
+### 6 `usbesafed-vm/src/orchestrator.py`
+**Purpose:** Detect USB Devices on the VM that have to be scanned and trigger necessary checks
+
+**Responsibilities:**
+- Find the USB device that has to be scanned
+- if usb-hid driver is loaded -> perform BadUSB checks
+- if usb-storage driver is loaded -> execute malware scan
+
+**Role in the workflow:**
+- Orchestrate workflow on VM, depending on device type. Called from main shell script.
+
+**VM Path:**
+- /opt/scanner/orchestrator.py
+
+
 
 ---
 
 ## Logical Execution Flow
 
 1. **Bootstrap:** `install.sh` prepares the VM (packages, autologin).
-2. **Service Management:** `usbesafed-vm.init` enables OpenRC to manage the daemon lifecycle.
+2. **Service Management:** `usbesafed-vm` enables OpenRC to manage the daemon lifecycle.
 3. **Runtime:** `usbesafed-vm.sh` runs as a persistent daemon and waits for scan requests.
-4. Placeholder
+4. **Device Orchestration:** Once a USB device is detected, usbesafed-vm.sh calls orchestrator.py, which detects USB Device to be scanned and tiggeres check.
+5. **BadUSB Check**: If the device has HID keyboard capabilities (or usb-hid is loaded), orchestrator.py invokes bad_usb_check.py to detect suspicious HID/keyboard behavior and potential BadUSB-style input attacks.
 5. **Scan Execution:** `scanner.py` performs the actual virus scanning and returns results.

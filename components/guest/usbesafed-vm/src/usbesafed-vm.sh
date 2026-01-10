@@ -47,6 +47,23 @@ set -eu
 # Placeholder paths (adjust later)
 # -----------------------------
 
+# ============================================================
+# Startup Banner
+# ============================================================
+
+# Used for logging the vm, logs can be looke at by running `grep usbesafed-vm /var/log/messages` in the vm
+log() {
+  logger -t usbesafed-vm -- "$*"
+}
+
+
+log "============================================================"
+log "USBeSafe VM Daemon started"
+log "Role      : Guest-side USB scanning daemon"
+log "State     : Initializing"
+log "============================================================"
+
+
 # Mount point of the real, physical USB stick inside the VM
 REAL_USB_MOUNT="/mnt/realusb"
 
@@ -62,15 +79,12 @@ SCANNER_CMD="/opt/scanner/scanner.py"
 # Polling interval in seconds
 POLL_SEC=1
 
+# Create the mount point directories (if missing)
+mkdir -p "$REAL_USB_MOUNT" "$VUSB_MOUNT"
 
 # -----------------------------
 # Helper functions
 # -----------------------------
-
-log() {
-  # Log to stderr so logs don't interfere with virtio output
-  echo "[usbesafed-vm] $*" >&2
-}
 
 send_virtio() {
   # Send a single line message to the host via virtio
@@ -89,14 +103,13 @@ send_virtio() {
   log "VM → HOST: $1"
 }
 
-wait_for_dir() {
-  # Block until a directory exists
-  # Used for detecting USB mount points
-  log "Waiting for directory: $1"
-  while [ ! -d "$1" ]; do
+wait_for_mount() {
+  # Block until a filesystem is actually mounted at the given path
+  log "Waiting for mount at: $1"
+  while ! mount | grep -q " $1 "; do
     sleep "$POLL_SEC"
   done
-  log "Directory available: $1"
+  log "Mounted filesystem detected at: $1"
 }
 
 run_scan() {
@@ -185,7 +198,7 @@ send_usb_size_gb() {
   [ "$size_gb" -lt 1 ] && size_gb=1
 
   log "Rounded size (GiB): $size_gb"
-  send_virtio "size_gb:${size_gb}" || log "WARN: failed to send size_gb message"
+  send_virtio "$size_gb" || log "WARN: failed to send size_gb message"
 }
 
 copy_real_to_vusb() {
@@ -243,7 +256,7 @@ while :; do
   # ----------------------------------------------------------
   # 1) Wait for REAL USB stick
   # ----------------------------------------------------------
-  wait_for_dir "$REAL_USB_MOUNT"
+  wait_for_mount "$REAL_USB_MOUNT"
   log "Real USB detected"
 
   # ----------------------------------------------------------
@@ -265,7 +278,7 @@ while :; do
     log "Scan failed, waiting for USB removal"
 
     # Debounce: wait until USB is removed
-    while [ -d "$REAL_USB_MOUNT" ]; do
+    while mount | grep -q " $REAL_USB_MOUNT "; do
       sleep "$POLL_SEC"
     done
     log "Real USB removed"
@@ -275,12 +288,13 @@ while :; do
   # ----------------------------------------------------------
   # 4) Wait for VIRTUAL USB stick (host attaches via QMP)
   # ----------------------------------------------------------
-  while [ ! -d "$VUSB_MOUNT" ]; do
-    if ! mount -t vfat /dev/disk/by-label/USBeSafe "$VUSB_MOUNT" 2>/dev/null; then
-      sleep "$POLL_SEC"
-    fi
+  # Wait until the vUSB is actually mounted at $VUSB_MOUNT
+  # (Directory existence is not enough; /mnt/vusb usually exists already)
+  while ! mount | grep -q " $VUSB_MOUNT "; do
+    mount -t vfat /dev/disk/by-label/USBeSafe "$VUSB_MOUNT" 2>/dev/null || true
+    sleep "$POLL_SEC"
   done
-  log "Virtual USB detected"
+  log "Virtual USB mounted and ready"
 
   # ----------------------------------------------------------
   # 5) Copy data
@@ -297,7 +311,7 @@ while :; do
   # 6) Debounce until both USBs are removed
   # ----------------------------------------------------------
   log "Copy finished, waiting for USB removal"
-  while [ -d "$REAL_USB_MOUNT" ] || [ -d "$VUSB_MOUNT" ]; do
+  while mount | grep -q " $REAL_USB_MOUNT " || mount | grep -q " $VUSB_MOUNT "; do
     sleep "$POLL_SEC"
   done
   log "USBs removed, returning to idle state"
