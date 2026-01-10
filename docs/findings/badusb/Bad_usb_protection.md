@@ -359,6 +359,20 @@ Test with yubikey:
 
 - usbfs driver is laoded, not NONE. What does it do? (Sometimes none, depends on PC)
 
+First of all the VM has to be prepared. As we are using Alpine, we have to make our scripts work!
+First execute these commands:
+sudo apt install guestfs-tools (on host)
+
+echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
+apk update
+apk add python3 eudev
+
+virt-customize -a images/alpine-base.qcow2
+--mkdir /opt/scanner \
+--mkdir /opt/scanner/badusb \
+--upload components/guest/usbesafed-vm/src/orchestrator.py:/opt/scanner/orchestrator.py \
+--upload components/guest/usbesafed-vm/src/badusb/bad_usb_check.py:/opt/scanner/badusb/bad_usb_check.py
+
 
 
 

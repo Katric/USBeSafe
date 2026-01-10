@@ -1,5 +1,5 @@
 # --- USBeSafe ---
-images/overlay.qcow2
+images/
 
 # --- OS cruft ---
 .DS_Store

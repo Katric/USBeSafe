@@ -12,32 +12,6 @@ RELEVANT_KEYBOARD_KEYS = [KEY_A, KEY_B, KEY_C, KEY_D, KEY_E, KEY_F, KEY_G, KEY_H
                           KEY_COMMA, KEY_SEMICOLON, KEY_SLASH, KEY_BACKSLASH]
 
 
-# Execute with sudo! otherwise can't list devices
-def main():
-    vid = "1532"
-    pid = "008a"
-
-    vid = "239a"
-    pid = "80f4"
-
-    devices = get_ev_key_input_devices(vid, pid)
-
-    # device can't send key inputs -> OK!
-    if len(devices) == 0:
-        return True
-
-    devices = {dev.fd: dev for dev in devices}
-
-    while True:
-        r, w, x = select(devices, [], [])
-        for fd in r:
-            for event in devices[fd].read():
-                if event.type == EV_KEY:
-                    print(event)
-
-    return None
-
-
 def start_red_light_green_light(device: InputDevice) -> bool:
     print("Starting red light green")
 
@@ -52,6 +26,7 @@ def get_ev_key_input_devices(vid: str, pid: str) -> list[InputDevice]:
     If yes, it has to be checked. If no, it has not to be checked.
     An empty list means that it has not to be checked
     """
+    print(f"[INFO] Getting keyboard event devices for {vid}:{pid}")
     devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
 
     vid_int = int(vid, 16)
@@ -59,17 +34,21 @@ def get_ev_key_input_devices(vid: str, pid: str) -> list[InputDevice]:
 
     key_input_devices: list[InputDevice] = []
 
+    has_keyboard_capabilities = False  # has the device with vid and pid combination keyboard caps?
     for device in devices:
         # find device matching the VID and PID
         if device.info.vendor == vid_int and device.info.product == pid_int:
             # if device can press buttons
             if EV_KEY in device.capabilities():
+                key_input_devices.append(device)
                 # check if the device supports any of the relevant keyboard keys
                 if any(key in set(device.capabilities()[EV_KEY]) for key in RELEVANT_KEYBOARD_KEYS):
-                    key_input_devices.append(device)
+                    print(f"[INFO] Device reports keyboard capabilities: {device}")
+                    has_keyboard_capabilities = True
 
+    if not has_keyboard_capabilities:
+        print(f"[INFO] Device does not report keyboard capabilities")
+        return []
+
+    print(f"[INFO] Device reports keyboard capabilities. Has to be checked.")
     return key_input_devices
-
-
-if __name__ == "__main__":
-    main()
