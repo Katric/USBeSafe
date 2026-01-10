@@ -169,17 +169,18 @@ sequenceDiagram
 | A1  | **VM / Security environment**              | Linus Rode                   |
 | A2  | **Virtual USB stick**                      | Paul Ilitz                   |
 | A3  | **CLI (VM start, USB script)**             | Paul Ilitz                   |
-| A4  | **Virus scan & traffic-light system**      | Constantin Schreyer          |
+| A4  | **Virus scan**                             | Constantin Schreyer          |
 | A5  | **Detect BadUSB**                          | Richard Kats & Tizian Everke |
 | A6  | **USB pass-through Host → VM (interface)** | Richard Kats & Tizian Everke |
-| A7  | **GUI (automated file management)**        | Aaron Debebe                 |
-| A8  | **Host side daemon**                       | Aaron Debebe                 |
+| A7  | **GUI (automated file management)**        | -                            |
+| A8  | **Host side daemon**                       | Linus Rode, Richard Kats & Tizian Everke, Paul Ilitz                    |
 | A9  | **Guest side daemon**                      | Linus Rode                   |
+| A9  | **Monitoring & Tests**                     | Aaron Debebe                 |
 | A10 | **Projektleitung**                         | Linus Rode, Paul Ilitz       |
 | A11 | **Modularbeit**                            | All                          |
 | A12 | **Zwischenpräsentation**                   | All                          |
 | A13 | **Abschlusspräsentation**                  | All                          |
-| A14 | **Risikoanalyse**                          | tbd                          |
+| A14 | **Risikoanalyse**                          | Paul Ilitz                          |
 
 
 ---
