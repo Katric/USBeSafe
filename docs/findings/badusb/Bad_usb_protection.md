@@ -138,7 +138,8 @@ This picture shows the mouse and an internal webcam of the test laptop.
 Looking at the bConfigurationValue, the device seems not to be configured correctly. 3-3 is the mouse and 3-4 the
 webcam.
 bConfigurationValue is empty for the mouse! This seems to mean, that no configuration is seletected
-for this usb device. Maybe it's stuck in some of the configuration states?
+for this usb device. Maybe it's stuck in some of the configuration states? Other devices on my PC normally have
+bCOnfigurationValue of 1, to select configuration 1. (may have low power config, high power, ...)
 https://www.beyondlogic.org/usbnutshell/usb5.shtml
 https://docs.kernel.org/usb/authorization.html
 
@@ -354,6 +355,9 @@ Test with yubikey:
 - random duration of phases
 - interactive CAPTCHA
 - not only checking if something is sent -> but also that NOTHING is sent
+
+
+- usbfs driver is laoded, not NONE. What does it do? (Sometimes none, depends on PC)
 
 
 
