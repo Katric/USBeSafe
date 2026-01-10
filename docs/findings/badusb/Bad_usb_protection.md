@@ -365,13 +365,13 @@ sudo apt install guestfs-tools (on host)
 
 echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
 apk update
-apk add python3 eudev
+apk add python3 eudev py3-evdev py3-udev
 
-virt-customize -a images/alpine-base.qcow2
---mkdir /opt/scanner \
---mkdir /opt/scanner/badusb \
+virt-customize -a images/alpine-base.qcow2 \
+--run-command 'mkdir -p /opt/scanner/badusb' \
 --upload components/guest/usbesafed-vm/src/orchestrator.py:/opt/scanner/orchestrator.py \
---upload components/guest/usbesafed-vm/src/badusb/bad_usb_check.py:/opt/scanner/badusb/bad_usb_check.py
+--upload components/guest/usbesafed-vm/src/badusb/bad_usb_check.py:/opt/scanner/badusb/bad_usb_check.py \
+--upload components/guest/usbesafed-vm/src/host_communication.py:/opt/scanner/host_communication.py
 
 
 
