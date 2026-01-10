@@ -66,7 +66,38 @@ The VM already contains all core components required for installation, virus sca
 
 ---
 
-### 5 `placeholder/placeholder/`
+### 5 `usbesafed-vm/src/badusb/bad_usb_check.py`
+**Purpose:** Perform BadUSB checks on the VM
+
+**Responsibilities:**
+- Detect USB HID Devices with Keyboard Capabilities
+- Detect BadUSB devices which send malicious input
+
+**Role in the workflow:**
+- called by orchestrator.py on the VM  if USB device inside the VM has keyboard input capabilities
+
+**VM Path:**
+- /opt/scanner/bad_usb_check.py
+
+---
+
+### 6 `usbesafed-vm/src/orchestrator.py`
+**Purpose:** Detect USB Devices on the VM that have to be scanned and trigger necessary checks
+
+**Responsibilities:**
+- Find the USB device that has to be scanned
+- if usb-hid driver is loaded -> perform BadUSB checks
+- if usb-storage driver is loaded -> execute malware scan
+
+**Role in the workflow:**
+- Orchestrate workflow on VM, depending on device type. Called from main shell script.
+
+**VM Path:**
+- /opt/scanner/orchestrator.py
+
+---
+
+### 7 `placeholder/placeholder/`
 **Purpose:**
 
 **Responsibilities:**
