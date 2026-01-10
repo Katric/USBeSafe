@@ -90,7 +90,7 @@ def show_scan_popup(device_info):
     serial = device_info.get('serial', 'N/A')
     
     message = (
-        f"USB Mass Storage Device Detected!\n\n"
+        f"USB Device Detected!\n\n"
         f"<b>VID:</b> {vid}, {vendor_name}\n"
         f"<b>PID:</b> {pid}, {product_name}\n"
         f"<b>Serial:</b> {serial}\n\n"
