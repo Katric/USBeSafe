@@ -5,6 +5,7 @@ This document describes how to install and run the SecurePass VM initialization 
 ## Purpose
 - Installs ClamAV
 - Enables root autologin on tty1
+- Installs the mount package
 - Must be run **once** as root inside the Alpine VM
 
 ---
