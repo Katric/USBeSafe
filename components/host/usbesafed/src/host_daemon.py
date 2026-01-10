@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import select
 import shutil
 import subprocess
 import time
@@ -11,7 +12,7 @@ from pyudev import Monitor, Context
 
 import popup
 from vusb import VirtualUSBStick
-from popup import show_delete_vusb_popup, show_scan_popup, StatusWindow
+from popup import show_delete_vusb_popup, StatusWindow
 import manage_usb_ids
 import check_and_load_bad_usb_config
 
@@ -43,7 +44,8 @@ def check_system_deps():
         "qemu-img": "qemu-utils",
         "wget": "wget",
         "virsh": "virsh",
-        "yad": "yad"
+        "yad": "yad",
+        "xterm": "xterm"
     }
 
     for tool, package in tools.items():
@@ -55,7 +57,7 @@ def check_system_deps():
         print(f"Missing system packages detected: {missing}\n")
         print("To install on Debian/Ubuntu, run:")
         print("  sudo apt-get update")
-        print("  sudo apt-get install -y qemu-system-x86 qemu-utils libvirt-clients qemu-kvm wget curl yad\n")
+        print("  sudo apt-get install -y qemu-system-x86 qemu-utils libvirt-clients qemu-kvm wget curl yad xterm\n")
         print("Then re-run the daemon.\n")
         return False
 
@@ -66,7 +68,7 @@ def check_system_deps():
 #                      Disable Auto-Mount
 # ============================================================
 
-def disable_udisks2_service(is_bad_usb_protection_active: bool):
+def disable_udisks2_service():
     """
     Masks and stops udisks2.service to disable auto-mount.
     """
@@ -90,6 +92,63 @@ def disable_udisks2_service(is_bad_usb_protection_active: bool):
     except subprocess.CalledProcessError as e:
         print(f"❌ Error when trying to stop udisks2. Code {e.returncode}: {e.stderr.strip()}")
         return False
+
+
+def set_usb_default_authorization(enable: bool):
+    """
+    Iterates over all USB root hubs and sets the 'authorized_default' value.
+
+    Args:
+        enable (bool):
+            If True, sets authorized_default to '1' (Auto-authorize new devices).
+            If False, sets authorized_default to '0' (Do not authorize new devices).
+    """
+    base_path = Path("/sys/bus/usb/devices")
+
+    # Determine the string value to write based on the boolean input
+    target_value = "1" if enable else "0"
+    state_desc = "ENABLED" if enable else "DISABLED"
+
+    print(f"[INFO] Auto-authorization will be {state_desc} ({target_value})...")
+
+    if not base_path.exists():
+        print(f"[ERROR]: Path {base_path} does not exist. Are you using a Linux OS :D ?")
+        return
+
+    changed_count = 0
+
+    # Iterate over all items in the directory
+    for device_dir in base_path.iterdir():
+        # Filter: We only want Root Hubs (e.g., usb1, usb2, usb10)
+        # We ignore sub-devices like '1-1'
+        if device_dir.name.startswith("usb") and device_dir.name[3:].isdigit():
+
+            auth_file = device_dir / "authorized_default"
+
+            if auth_file.exists():
+                try:
+                    # Read current value to check if an update is actually needed
+                    current_val = auth_file.read_text().strip()
+
+                    if current_val != target_value:
+                        # Write the new value
+                        auth_file.write_text(target_value)
+                        print(
+                            f"[OK] {device_dir.name}: authorized_default changed from {current_val} to {target_value}.")
+                        changed_count += 1
+                    else:
+                        print(f"[INFO] {device_dir.name}: Already set to {target_value}.")
+
+                except PermissionError:
+                    print(f"[ERROR] Permission denied for {device_dir.name}. Please run with 'sudo'.")
+                except Exception as e:
+                    print(f"[ERROR] Failed to access {device_dir.name}: {e}")
+            else:
+                # Some controllers might not support this attribute
+                print(f"[SKIP] {device_dir.name}: File 'authorized_default' not found.")
+
+    print("-" * 40)
+    print(f"[INFO] Done. Updated {changed_count} USB buses to {target_value}.")
 
 
 # ============================================================
@@ -167,10 +226,13 @@ def start_vm(vid, pid):
         else:
             print("[WARNING] KVM not available, using software emulation (slower)")
 
-        print("[INFO] Launching QEMU:")
+        terminal_cmd = ["xterm", "-title", "VM Output", "-e"]
+        final_cmd = terminal_cmd + qemu_cmd
+
+        print("[INFO] Launching QEMU in new terminal:")
         print(" ".join(qemu_cmd))
 
-        vm_process = subprocess.Popen(qemu_cmd)
+        vm_process = subprocess.Popen(final_cmd)
 
         print(f"[+] VM started (PID: {vm_process.pid})")
 
@@ -185,21 +247,45 @@ def start_vm(vid, pid):
 #                     VIRTIO MESSAGE RECV
 # ============================================================
 
-def wait_for_virtio():
+def wait_for_virtio(vm, timeout=600):
     print("[INFO] Waiting for VM daemon messages…")
+
+    start_time = time.time()
 
     # Wait for virtio socket
     while not os.path.exists(VIRTIO_SOCKET):
+        if vm.poll() is not None:
+            raise Exception(f"VVM died while booting (Exit Code: {vm.returncode})")
+
+        if time.time() - start_time > timeout:
+            raise Exception("Exception waiting for Virtio Socket creation")
+
         time.sleep(0.2)
 
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
-        s.connect(VIRTIO_SOCKET)
+        try:
+            s.connect(VIRTIO_SOCKET)
+            s.setblocking(False)
 
-        while True:
-            data = s.recv(1024).decode().strip()
-            if data:
-                print(f"[VM → HOST] {data}")
-                return data
+            while True:
+                if vm.poll() is not None:
+                    raise Exception(f"VM crashed unexpectedly during communication (Code: {vm.returncode})")
+
+                if time.time() - start_time > timeout:
+                    raise Exception("Timeout waiting for response from VM")
+
+                ready_to_read, _, _ = select.select([s], [], [], 0.5)
+
+                if ready_to_read:
+                    data = s.recv(1024).decode().strip()
+                    if data:
+                        print(f"[VM → HOST] {data}")
+                        return data
+                    else:
+                        raise Exception("Connection closed by VM")
+
+        except Exception as e:
+            raise Exception(f"Socket communication error: {e}")
 
 
 # ============================================================
@@ -214,7 +300,8 @@ def qmp_send(cmd):
             s.recv(4096)  # QMP greeting
             s.send((cmd + "\n").encode())
             return s.recv(4096).decode()
-    except:
+    except Exception as e:
+        print(f"Socket communication error: {e}")
         return None
 
 
@@ -223,8 +310,8 @@ def kill_vm(vm):
     try:
         qmp_send('{ "execute": "system_powerdown" }')
         vm.wait(timeout=5)
-    except:
-        print("[WARN] Hard kill")
+    except Exception as e:
+        print(f"[WARN] Hard kill: {e}")
         vm.kill()
 
 
@@ -244,24 +331,76 @@ def set_usb_autoprobe(enabled: bool):
         val = "1" if enabled else "0"
         with open("/sys/bus/usb/drivers_autoprobe", "w") as f:
             f.write(val)
+        if enabled:
+            print("[INFO] USB autoprobe enabled")
+        else:
+            print("[INFO] USB autoprobe disabled")
     except Exception as e:
         print(f"[ERROR] Could not set driver_autoprobe: {e}")
 
 
-def safe_authorize_device(device_sys_path):
-    """
-    Authorizes the device but deactivaets driver_autoprobe before, so no drivers are loaded on the host.
-    Also sets bConfigurationValue of this device to 1.
-    """
-    print(f"Deactivating driver_autoprobe globally and authorizing device: {device_sys_path}")
-    set_usb_autoprobe(False)
+def authorize_and_trigger_usb_probe(device: pyudev.Device):
+    """Send usb interface to drivers_probe"""
+    probing_path = "/sys/bus/usb/drivers_probe"
+
+    set_authorize_device(device.sys_path, True)
+
     try:
+        with open(probing_path, "w") as f:
+            f.write(device.sys_name)
+
+        print(f"[INFO] USB probe initialized for {device.sys_name}")
+    except Exception as e:
+        print(f"[ERROR] Could not set driver_probe: {e}")
+
+    for child in device.children:
+        print(child.device_type)
+        if child.device_type == 'usb_interface':
+            sys_name = child.sys_name
+            print(f"Interface gefunden: {child.sys_name}")
+
+            try:
+                with open(probing_path, "w") as f:
+                    f.write(sys_name)
+
+                print(f"[INFO] USB probe initialized for {sys_name}")
+            except Exception as e:
+                print(f"[ERROR] Could not set driver_probe: {e}")
+
+
+def set_authorize_device(device_sys_path, enable: bool) -> bool:
+    """
+    Activates or deactivates authorization
+    :param device_sys_path: The path to the device
+    :param enable: Whether to enable or disable authorization
+    :returns: True or False if setting the authorization value was successful
+    """
+    try:
+        val = "1" if enable else "0"
         auth_path = os.path.join(device_sys_path, "authorized")
         with open(auth_path, "w") as f:
-            f.write("1")
-        time.sleep(0.5)  # wait a little
+            f.write(val)
+        if enable:
+            print(f"[INFO] Successfully authorized device {device_sys_path}")
+        else:
+            print(f"[INFO] Successfully unauthorized device {device_sys_path}")
+        return True
     except Exception as e:
-        print(f"Error during authorization: {e} Reactivating driver_autoprobe.")
+        print(f"[Error] An error occurred during authorization: {e}")
+        return False
+
+
+def safe_authorize_device(device_sys_path):
+    """
+    Authorizes the device but deactivates driver_autoprobe before, so no drivers are loaded on the host.
+    Also sets bConfigurationValue of this device to 1.
+    """
+    print(f"[INFO] Deactivating driver_autoprobe globally and authorizing device: {device_sys_path}")
+    set_usb_autoprobe(False)
+    if set_authorize_device(device_sys_path, True):
+        time.sleep(0.5)  # wait a little
+    else:
+        print("Reactivating driver_autoprobe...")
         set_usb_autoprobe(True)
         return False
 
@@ -271,7 +410,7 @@ def safe_authorize_device(device_sys_path):
         with open(config_path, "w") as f:
             f.write("1")
 
-        print(f"Device {device_sys_path} configured (Active Config=1)")
+        print(f"[INFO] Device {device_sys_path} bConfigurationValue configured (Active Config=1)")
         time.sleep(0.5)  # wait a little
     except Exception as e:
         print(f"ERROR: Could not set configuration: {e}")
@@ -280,7 +419,7 @@ def safe_authorize_device(device_sys_path):
     return True
 
 
-def handle_add_usb(is_bad_usb_protection_active: bool):
+def handle_add_usb():
     """
     Listens to ADD udev events and reads the following properties:
     - VID
@@ -312,23 +451,21 @@ def handle_add_usb(is_bad_usb_protection_active: bool):
         # for key, value in device.items():
         #    print(f"  {key:<20}: {value}")
 
-        print(f"{device} connected")
+        print(f"[INFO] {device} connected")
 
         # --- Only parent USB device ---
         if device.get('DEVTYPE') != 'usb_device':
             print(f"Device type is {device.get('DEVTYPE')}. Skipping.")
             continue
 
-        print(f"🔒 Sicheres Aufwecken von {device.device_path}...")
+        set_authorize_device(device.sys_path, False)
 
-        # deactivate device_autoprobe and then authorize this device
-        safe_authorize_device(device.sys_path)
+        print(f"[INFO] Safe wakeup of {device.device_path}...")
 
         # --- VID/PID extraction ---
         vid = device.get('ID_VENDOR_ID', None)
         pid = device.get('ID_MODEL_ID', None)
         serial = device.get('ID_SERIAL_SHORT', device.get('ID_SERIAL', None))
-        # TODO get usb storage size
 
         if vid is None or pid is None:
             print("[Warning] Cannot identify usb device")
@@ -341,93 +478,47 @@ def handle_add_usb(is_bad_usb_protection_active: bool):
         # Wait briefly for kernel to finish setting up children
         time.sleep(2)
 
-        # --- Check if USB-storage interface exists ---
-        is_mass_storage = True
-        for child in device.children:
-            if (child.get('DEVTYPE') == 'usb_interface' and
-                    child.get('DRIVER') == 'usb-storage'):
-                is_mass_storage = True
-                break
-
         print("\n✅ New USB Device detected!")
         print("-" * 40)
         print(f"  VID               : {vid}, {vendor_name}")
         print(f"  PID               : {pid}, {product_name}")
         print(f"  Serial Number     : {serial}")
         print(f"  Path              : {device.device_path}")
-        print(f"  Is mass storage   : {is_mass_storage}")
         print("-" * 40)
+        print("\n")
 
         device_info = {"vid": vid, "vendor_name": vendor_name, "pid": pid, "product_name": product_name,
                        "serial": serial}
 
-        # ########################################
-        # ########## BAD_USB_PROTECTION ##########
-        # ########################################
-
-        if is_bad_usb_protection_active:
-            # hash usb device and register it on the whitelist (as wished by the user)
-            device_hash_for_whitelisting = manage_usb_ids.get_hashed_device_attributes(device)
-            is_on_whitelist = manage_usb_ids.is_device_whitelisted(device_hash_for_whitelisting)
-            if is_on_whitelist:
-                print("[Info] Device is present on the whitelist.")
-
-                # If 'is_mass_storage'      ->  forwarding usb stick to VM without asking the user
-                # Else 'not a mass storage' ->  usb device will be authorized immediately (e.g. a keyboard was detected)
-                if is_mass_storage:
-                    print("[Info] Device is identified as a flash drive. Forwarding usb device to VM...")
-                    try:
-                        status_window.update("Preparing VM overlay and starting headless VM...")
-
-                        # --- Full Script 3 Logic (overlay + virtio + QMP) ---
-                        run_prod_scan(vid, pid, status_window)
-
-                    except Exception as e:
-                        status_window.update(f"Error: {str(e)}")
-                        print(f"[ERROR] Exception during VM scan: {e}")
-                        time.sleep(3)
-                        status_window.close()
-                        raise
-
-                else:
-                    print("[Info] Device is NOT identified as a flash drive. USB Device will be authorized...")
-                    # TODO: authorize usb device to host pc
-
-            else:
-                print("[Warning] Device is NOT present on the whitelist and needs to be scanned.")
-                # If 'scan'         ->  pass PCI Controller to VM
-                # Else 'don't scan' ->  reject USB device and let it stay unauthorized
-                if not popup.show_whitelist_popup(device_info):
-                    print("🚫 Scan cancelled by user")
-                    continue
-                else:
-                    print("[Info] Scan accepted. PCI Controller will be passed to VM for secure scanning...")
-                    # TODO: implement forwarding PCI controller to VM
-
-                # manage_usb_ids.add_to_whitelist_file(device_hash_for_whitelisting)    # <-- registers an usb stick to the whitelist
+        # check if usb device is already on the whitelist
+        device_hash_for_whitelisting = manage_usb_ids.get_hashed_device_attributes(device)
+        is_on_whitelist = manage_usb_ids.is_device_whitelisted(device_hash_for_whitelisting)
+        if is_on_whitelist:
+            print("[Info] Device is present on the whitelist.")
+            authorize_and_trigger_usb_probe(device)
+            print("[OK] Check complete. Device can now be used on the host system")
+            continue
 
         else:
-            # if usb-protection is turned off
+            print("[Warning] Device is NOT present on the whitelist and needs to be scanned.")
 
-            if not is_mass_storage:
-                print("Not a mass storage device. Skipping.")
-                continue
-
-            # ---------------- popup you already implemented ----------------
-            if not show_scan_popup(device_info):
+            if not popup.show_whitelist_popup(device_info):
                 print("🚫 Scan cancelled by user")
                 continue
 
-            # ---------------- Status Popup ----------------
+            print("[Info] Scan accepted by user (or auto-timeout). Device will be passed to VM for secure scanning...")
+
+            # deactivate device_autoprobe and then authorize this device
+            safe_authorize_device(device.sys_path)
+
             status_window = StatusWindow(device_info)
             status_window.start()
             status_window.update("Building VM configuration...")
-
             try:
                 status_window.update("Preparing VM overlay and starting headless VM...")
 
                 # --- Full Script 3 Logic (overlay + virtio + QMP) ---
-                run_prod_scan(vid, pid, status_window)
+                run_prod_scan(vid, pid, status_window, device, device_hash_for_whitelisting)
 
             except Exception as e:
                 status_window.update(f"Error: {str(e)}")
@@ -441,7 +532,7 @@ def handle_add_usb(is_bad_usb_protection_active: bool):
 #                       USB LOGIC
 # ============================================================
 
-def run_prod_scan(vid, pid, status_window):
+def run_prod_scan(vid, pid, status_window, usb_device, device_hash: str):
     """
     Runs the ENTIRE Script 3 logic:
     - Overlay creation
@@ -452,64 +543,153 @@ def run_prod_scan(vid, pid, status_window):
     - Shutdown
     - Cleanup
     """
-    create_overlay()
-    vm = start_vm(vid, pid)
 
-    # ---------------- FIRST MESSAGE (OK or FAIL) ----------------
-    result = wait_for_virtio()
+    # THEY ARE USED !!!!!!
+    result = ""
+    is_mass_storage = None
+    vm = None
+
+    try:
+        create_overlay()
+        vm = start_vm(vid, pid)
+
+        # ---------------- FIRST MESSAGE (OK or FAIL) ----------------
+        # will be in format "ok,True", "ok,False", "fail,"
+        result, is_mass_storage = wait_for_virtio(vm).strip().split(',')
+
+    except Exception as e:
+        print(f"[ERROR] Exception during VM creation {e}")
+        kill_vm_and_cleanup_overlay(vm, usb_device)
+        eject_usb_device(usb_device.sys_path)
+        status_window.update("An exception occurred during scan. Closing application...")
+        time.sleep(3)
+        status_window.close()
+        return
+
+    finally:
+        # set usb device in any case to 0
+        time.sleep(1)
 
     if result == "fail":
-        status_window.update("Scan FAILED, malware detected!")
-        kill_vm(vm)
-        cleanup_overlay()
+        status_window.update("Scan FAILED, malware detected! Ejecting usb device...")
+        kill_vm_and_cleanup_overlay(vm, usb_device)
+        eject_usb_device(usb_device.sys_path)
+        status_window.close()
         return
 
     if result == "ok":
-        status_window.update("Scan clean, waiting for copy…")
-        # ---------------- SECOND MESSAGE (USB SIZE) ----------------
-        real_usb_size_gb = wait_for_virtio()
-        if not real_usb_size_gb.isdigit():
-            status_window.update("Error: Invalid USB size received from VM.")
-            kill_vm(vm)
-            cleanup_overlay()
-            return
-        status_window.update(f"Preparing vUSB of size {real_usb_size_gb} GB...")
-        vUSB = VirtualUSBStick(image_path=VUSB_IMMAGE, size_mb=int(real_usb_size_gb) * 1024, qmp_socket=QMP_SOCKET,
-                               device_id="vusb")
-        try:
-            vUSB.create(filesystem='vfat', label='USBeSafe')
-            vUSB.attach_to_vm()
-            status_window.update("vUSB attached to VM, waiting for copy…")
-        except Exception as e:
-            status_window.update(f"Error setting up vUSB: {e}")
-            kill_vm(vm)
-            cleanup_overlay()
-            return
-        # ---------------- WAIT FOR "copy_done" ----------------
-        msg = wait_for_virtio()
-        if msg == "copy_done":
-            status_window.update("Copy completed.")
-            time.sleep(2)
-            vUSB.detach_from_vm()
-            status_window.update("Shutting down VM…")
-            kill_vm(vm)
-            cleanup_overlay()
-            vUSB.mount_on_host()
-            status_window.update(f"vUSB mounted on host at {vUSB.host_mount}")
 
-            if show_delete_vusb_popup(vUSB.host_mount):
-                vUSB.unmount_from_host()
-                os.remove(vUSB.image_path)
-                status_window.update("Temporary vUSB image deleted.")
+        # usb device is safe. Register it on the whitelist if it is NOT a mass storage device
+        if is_mass_storage == "False":
+            print("[Info] Device will be added to whitelist...")
+            kill_vm_and_cleanup_overlay(vm, usb_device)
+            manage_usb_ids.add_to_whitelist_file(device_hash)
+            authorize_and_trigger_usb_probe(usb_device)
+            status_window.update("Device was successfully authorized and added to the whitelist!")
+            time.sleep(3)
+            status_window.close()
+            return
+
+        elif is_mass_storage == "True":
+            print("[Info] Device was marked as a mass storage device and will not be added to the whitelist")
+
+            status_window.update("Scan clean, waiting for copy…")
+            # ---------------- SECOND MESSAGE (USB SIZE) ----------------
+            real_usb_size_gb = wait_for_virtio(vm)
+            if not real_usb_size_gb.isdigit():
+                status_window.update("Error: Invalid USB size received from VM.")
+                kill_vm_and_cleanup_overlay(vm, usb_device)
+                eject_usb_device(usb_device.sys_path)
+                time.sleep(3)
+                status_window.close()
+                return
+
+            status_window.update(f"Preparing vUSB of size {real_usb_size_gb} GB...")
+            v_usb = VirtualUSBStick(image_path=VUSB_IMMAGE, size_mb=int(real_usb_size_gb) * 1024, qmp_socket=QMP_SOCKET,
+                                    device_id="vusb")
+            try:
+                v_usb.create(filesystem='vfat', label='USBeSafe')
+                v_usb.attach_to_vm()
+                status_window.update("vUSB attached to VM, waiting for copy…")
+            except Exception as e:
+                status_window.update(f"Error setting up vUSB: {e}")
+                kill_vm_and_cleanup_overlay(vm, usb_device)
+                eject_usb_device(usb_device.sys_path)
+                status_window.close()
+                return
+
+            # ---------------- WAIT FOR "copy_done" ----------------
+            msg = wait_for_virtio(vm)
+            if msg == "copy_done":
+                status_window.update("Copy completed.")
+                time.sleep(2)
+                v_usb.detach_from_vm()
+                status_window.update("Shutting down VM…")
+                kill_vm_and_cleanup_overlay(vm, usb_device)
+                v_usb.mount_on_host()
+                status_window.update(f"vUSB mounted on host at {v_usb.host_mount}")
+
+                if show_delete_vusb_popup(v_usb.host_mount):
+                    v_usb.unmount_from_host()
+                    os.remove(v_usb.image_path)
+                    status_window.update("Temporary vUSB image deleted.")
+                else:
+                    status_window.update("Temporary vUSB image kept.")
+
+                time.sleep(3)
+                status_window.close()
+                return
             else:
-                status_window.update("Temporary vUSB image kept.")
+                print("[ERROR] Unknown message while trying to wait for 'copy_done'")
+                time.sleep(3)
+                status_window.close()
+                kill_vm_and_cleanup_overlay(vm, usb_device)
+                eject_usb_device(usb_device.sys_path)
+                return
 
+        else:
+            print("[ERROR] Variable is_mass_storage is unknown")
+            status_window.update("Unknown VM message.")
+            time.sleep(3)
+            status_window.update("Shutting down VM...")
+            kill_vm_and_cleanup_overlay(vm, usb_device)
+            eject_usb_device(usb_device.sys_path)
+            time.sleep(3)
+            status_window.close()
             return
 
-    # unknown
-    status_window.update("Unknown VM message.")
-    kill_vm(vm)
+
+def eject_usb_device(device_path):
+    """
+    Eject an usb device from the host system.
+    :param device_path: The device's system path.
+    """
+    try:
+        usb_bus_id = os.path.basename(device_path)
+        print(f"[INFO] Ejecting USB device from bus {usb_bus_id}...")
+        remove_file = f"/sys/bus/usb/devices/{usb_bus_id}/remove"
+        if os.path.exists(remove_file):
+            with open(remove_file, 'w') as f:
+                f.write('1')
+            print(f"[INFO] USB device {device_path} ejected successfully")
+        else:
+            print(f"[ERROR] Could not eject USB device at {remove_file}. Is the device still plugged in?")
+
+    except PermissionError:
+        print("[ERROR] You need sudo rights to eject USB device.")
+    except Exception as e:
+        print(f"[ERROR] Could not eject USB device {e}")
+
+
+def kill_vm_and_cleanup_overlay(vm, device: pyudev.Device):
+    set_authorize_device(device.sys_path, False)
+
+    if vm:
+        kill_vm(vm)
+        print("[INFO] Success, cleaning up...")
     cleanup_overlay()
+    print("[INFO] Done")
+    time.sleep(3)  # <-- IS IMPORTANT
 
 
 def is_bad_usb_protection_active() -> bool:
@@ -530,9 +710,15 @@ def main():
     if not check_system_deps():
         return
 
-    is_protection_active: bool = is_bad_usb_protection_active()
-    disable_udisks2_service(is_protection_active)  # disable and mask udisks2 to disable automount
-    handle_add_usb(is_protection_active)
+    # ########## To Restore functionality xD ##########
+    # set_usb_autoprobe(True)
+    # set_usb_default_authorization(True)
+
+    # # Disable 'authorized_default' values on all usb bus systems
+    set_usb_default_authorization(False)
+    set_usb_autoprobe(False)
+    disable_udisks2_service()  # disable and mask udisks2 to disable automount
+    handle_add_usb()
 
 
 if __name__ == "__main__":
