@@ -36,11 +36,9 @@ def start_red_light_green_light(vid: str, pid: str) -> bool:
 
     print(f"[INFO] Device reports keyboard capabilities. Has to be BadUSB-checked.")
 
-    rounds = random.randint(3, 4)
-
     is_first_round = True
-    for i in range(1, rounds + 1):
-        print(f"[INFO] Starting round {i}/{rounds}...")
+    for i in range(1, 4):  # 3 rounds
+        print(f"[INFO] Starting round {i}/3...")
 
         # GREEN PHASE
         duration = random.uniform(5.0, 10.0)
@@ -60,7 +58,7 @@ def start_red_light_green_light(vid: str, pid: str) -> bool:
             print("[INFO] Received input during green phase.")
 
         # RED PHASE
-        duration = random.uniform(5.0, 10.0)
+        duration = random.uniform(3.0, 10.0)
         print(f"[INFO] Red phase is {duration} seconds. No input must be sent.")
 
         time.sleep(0.5)
