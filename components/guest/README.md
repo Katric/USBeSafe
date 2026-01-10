@@ -50,7 +50,7 @@ The VM already contains all core components required for installation, virus sca
 
 ---
 
-### 4 `usbesafed-vm/src/usbesafed-vm.init`
+### 4 `usbesafed-vm/src/usbesafed-vm`
 **Purpose:** **OpenRC init script** for daemon management.
 
 **Responsibilities:**
@@ -95,24 +95,15 @@ The VM already contains all core components required for installation, virus sca
 **VM Path:**
 - /opt/scanner/orchestrator.py
 
----
 
-### 7 `placeholder/placeholder/`
-**Purpose:**
-
-**Responsibilities:**
-
-**Role in the workflow:**
-
-**VM Path:**
-- /opt/scanner/placeholder.py
 
 ---
 
 ## Logical Execution Flow
 
 1. **Bootstrap:** `install.sh` prepares the VM (packages, autologin).
-2. **Service Management:** `usbesafed-vm.init` enables OpenRC to manage the daemon lifecycle.
+2. **Service Management:** `usbesafed-vm` enables OpenRC to manage the daemon lifecycle.
 3. **Runtime:** `usbesafed-vm.sh` runs as a persistent daemon and waits for scan requests.
-4. Placeholder
+4. **Device Orchestration:** Once a USB device is detected, usbesafed-vm.sh calls orchestrator.py, which detects USB Device to be scanned and tiggeres check.
+5. **BadUSB Check**: If the device has HID keyboard capabilities (or usb-hid is loaded), orchestrator.py invokes bad_usb_check.py to detect suspicious HID/keyboard behavior and potential BadUSB-style input attacks.
 5. **Scan Execution:** `scanner.py` performs the actual virus scanning and returns results.
