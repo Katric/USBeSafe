@@ -1,3 +1,7 @@
+import os
+import subprocess
+import time
+
 import pyudev
 from pyudev import Device
 
@@ -59,11 +63,57 @@ def main():
             send_to_host("fail,")
             return
 
-    # Execute malware scans
+    # Trigger the execution of malware scans by mounting on /mnt/realusb.
+    # TODO what to do if usb has multiple partitions?!
     if "usb-storage" in device_drivers:
-        # TODO mount and scan
-        print("TODO STORAGE")
-        return  # virtio handling for usb storage is usbesafed-vm.sh's responsibility
+        # create mount point
+        mount_point = "/mnt/realusb"
+        if not os.path.exists(mount_point):
+            os.makedirs(mount_point)
+
+        potential_devices = ["/dev/sdb1", "/dev/sdb"]
+        mounted_successfully = False
+        detected_fstype = None
+
+        for device_path in potential_devices:
+            if not os.path.exists(device_path):
+                continue
+
+            print(f"[INFO] Analyzing {device_path}...")
+            # find file system type
+            try:
+                blkid_out = subprocess.check_output(
+                    ["blkid", "-o", "value", "-s", "TYPE", device_path],
+                    stderr=subprocess.DEVNULL
+                )
+                detected_fstype = blkid_out.decode('utf-8').strip()
+            except subprocess.CalledProcessError:
+                print(f"[DEBUG] No file system found for {device_path}.")
+                continue
+
+            if not detected_fstype:
+                continue
+
+            print(f"[INFO] Found file system for {device_path}: {detected_fstype}")
+
+            mount_opts = ["-o", "ro,noexec"]
+
+            mount_cmd = ["mount", "-t", detected_fstype] + mount_opts + [device_path, mount_point]
+
+            try:
+                print(f"[INFO] Trying to mount on: {' '.join(mount_cmd)}")
+                subprocess.run(mount_cmd, check=True)
+                print(f"[SUCCESS] Successfully mounted on {mount_point} (Type: {detected_fstype})")
+                mounted_successfully = True
+                return
+            except subprocess.CalledProcessError as e:
+                print(f"[WARN] Mount failed for {device_path}: {e}")
+                continue
+
+        if not mounted_successfully:
+            print("[ERROR] Could not mount or no filesystem detected.")
+            host_communication.send_to_host("fail,")
+            return
 
     # if device is HID and not mass storage
     host_communication.send_to_host("ok,False")

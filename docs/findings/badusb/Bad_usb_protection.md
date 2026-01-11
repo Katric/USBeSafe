@@ -394,5 +394,9 @@ virt-customize -a images/alpine-base.qcow2 \
 --run-command 'rc-update add udev-trigger sysinit' \
 --run-command 'rc-update add orchestrator-vm default'
 
+virt-customize -a images/alpine-base.qcow2 \
+--upload components/guest/usbesafed-vm/src/orchestrator.py:/opt/scanner/orchestrator.py
+
+
 
 
