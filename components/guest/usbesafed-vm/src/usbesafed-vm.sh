@@ -13,7 +13,7 @@ set -eu
 # 2. Automatically run a malware scan on the REAL USB stick.
 #
 # 3. If the scan FAILS:
-#      - Send "fail" to the host via virtio
+#      - Send "fail," to the host via virtio
 #      - Do nothing else (host will destroy VM + overlay)
 #
 # 4. If the scan SUCCEEDS:
@@ -267,14 +267,14 @@ while :; do
     # 3a) Scan OK
     # ------------------------------------------------------
     log "Scan result: OK"
-    send_virtio "ok"     # positive scan result
+    send_virtio "ok,True"     # positive scan result
     send_usb_size_gb     # inform host about required vUSB size
   else
     # ------------------------------------------------------
     # 3b) Scan FAIL
     # ------------------------------------------------------
     log "Scan result: FAIL"
-    send_virtio "fail"
+    send_virtio "fail,"
     log "Scan failed, waiting for USB removal"
 
     # Debounce: wait until USB is removed

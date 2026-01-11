@@ -138,7 +138,8 @@ This picture shows the mouse and an internal webcam of the test laptop.
 Looking at the bConfigurationValue, the device seems not to be configured correctly. 3-3 is the mouse and 3-4 the
 webcam.
 bConfigurationValue is empty for the mouse! This seems to mean, that no configuration is seletected
-for this usb device. Maybe it's stuck in some of the configuration states?
+for this usb device. Maybe it's stuck in some of the configuration states? Other devices on my PC normally have
+bCOnfigurationValue of 1, to select configuration 1. (may have low power config, high power, ...)
 https://www.beyondlogic.org/usbnutshell/usb5.shtml
 https://docs.kernel.org/usb/authorization.html
 
@@ -242,5 +243,163 @@ Result:
 What are the drawbacks?
 
 - not very convenient, but we could manually trigger driver probing after scans finished
+
+# How to find the device that has  to be scanned on the VM?
+
+The VM has 3 virtual USB Controllers by default with Product ID's of 1-3 by the vendor '1d6b' (Linux Foundation).
+Now that we don't pass the whole PCI USB Controller to the VM with all the connected devices but only the one that has
+to be scanned,
+it can be identified by looping over all USB Devices on the VM and skipping the USB Controllers mentioned above.
+
+![img.png](imgs/img_10.png)
+
+This image shows a keyboard that has been passed through to the VM. Next to the three USB COntrollers it's the only
+device
+present on the VM. The next step would be to identify the drivers it's loading.
+
+The planned approach looks like the following:
+If the "usb-hid" driver is loaded, e.g. for keyboards and other input devices, the bad usb scan should be performed.
+If the BadUSB scan fails, the host is notified via a FAIL message via the Virtio port.
+If the result is ok, we continue the search for the "usb-storage" driver.
+If it is loaded, the malware scan for usb devices is executed.
+If the result is ok, then an OK message is sent to the host via virtio. Additionally, we want to include a boolean flag,
+whether the device was a storage device or not, so the host can whitelist the device. If it is a storage device, it
+should not be whitelisted,
+because its contents should be scanned every time before being handed over to the user.
+
+Noticed: When device is passed authorized to VM and returns, drivers are loaded even if autoprobing is off! Solution:
+Set authorized = 0 before passing back the device in the VM! This way the device comes back with authorized = 0 to the
+host and drivers are not loaded.
+
+Next step for the host would be to set drivers_autoprobing to 1 again and set authorize to 1 and the device is ready to
+use.
+
+It is not easy to identify a Keyboard via its drivers. Taking per se all "usb-hid" devices could be too much.
+E.g. some headsets load hid too, because they have buttons. Some lighting controller load HID too! But it does not have
+any buttons. How can we find out, whether a device is harmful?
+Maybe check for the presence of some keys in the keymaps? How can we find the keymaps?
+We can just check the device capabilities with the evdev python package.
+We can check if the device supports key events of type EV_KEY, which describes state changes of buttons
+etc https://docs.kernel.org/input/event-codes.html.
+
+Testing the capabilities of the BadUSB Stick: it has EV_KEY!
+
+But also Headsets have EV_KEY: e.g. KEY_VOLUMEUP.
+My next approach would be to filter if the device supports potentially "dangerous" keys, as EV_KEYS supports
+contains many keys like KEY_A, KEY_0 or KEY_SPACE. The approach now is to scan whether the device supports any keys
+between
+KEY_A - KEY_Z, KEY_0 - KEY_9, and functional keys like KEY_ENTER.
+This could narrow down the amount of potentially dangerous devices that have to be checked and throws out HID devices
+that most likely are not dangerous.
+![img.png](imgs/img_11.png)
+![img_1.png](imgs/img_12.png)
+
+The headset still falls under the selection, because ALL the to be checked keys are supported, even though only
+KEY_VOLUMEUP
+and KEY_VOLUMEDOWN can actively be used by turning a volume wheel. As this is potential danger, we have to scan this
+device too!
+The modified Raspberry Pi BadUSB also supports all our relevant keys.
+
+The original approach was to first ask the user if he has just connected a Keyboard.
+If the user clicks yes, the device is scanned. If he clicks no, the device is immediately ejected.
+This is also done similarly by some anti virus programs like G Data on Windows.
+Here are some observations of the BadUSB Protection of G Data with some test devices:
+
+- Keyboard:
+    - is detected -> pop up opens and says that a keyboard was connected. Accept or block?
+    - if click accept -> have to enter 4 digit code either by using ANOTHER keyboard or a mouse
+- Razer Mouse:
+    - Detected as keyboard too
+    - Fully usable, even thumb keys on the side (maybe it's the dpi switch?)
+- Funny part: Plugging in Pico BadUSB
+    - NOT detected as Keyboard and badusb firmware is executed! (youtube video is opened via terminal)
+    - Guess: G DATA recognized it as usb-storage device first... maybe they don't check for keyboards then?!
+    - after trying again with Pin GP1 and GND shorted to suppress the usb-storage driver, a keyboard is detected and the
+      payload is not executed
+- Headset
+    - detected as keyboard
+    - Sound works and VOLUMEUP and VOLUMEDOWN too
+    - after clicking on block the device is still available
+
+The idea with the challenge-response approach with the question whether it is a keyboard and by entering the 4 digit
+code is good, but can easily be circumvented and be annoying to the user.
+Unfortunately as seen with the headset, not every "real" device has the possiblity to enter digits even if its
+registered as its capabilities(like the headset).
+To still keep the protection as effective as possible this will be the approach:
+We will implement a Red-Light Green-Light game like in squid game.
+Show green light: user has to press any button on the device ONCE. (timeout between 4-8 seconds)
+If time runs out, the device is blocked.
+Then after the key is pressed at green light: show red light for 3-8 seconds
+if a key is pressed during red light -> device is immediately blocked
+This is repeated for 3-4 rounds.
+It can be circumvented potentially, but finding the perfect rythm is unlikely as the rounds can overlap because of the
+different time slots.
+If all tests are passed, the device is likely to be authorized.
+This has the advantage: Firmware with something like "wait for 15 minutes and then start the attack" won't work, because
+it's timing out.
+
+A potential danger comes from e.g. real devices that still have bad usb installed on them! but that is very unlikely.
+Worst case: Real device cant get authorized! Solution: Whitelist it manually.
+
+But back to the game: Now we found a way to precisely decide whether a device has keyboard capabilities and has to be
+checked or if it is just a "harmless" input device.
+
+Test with yubikey:
+
+- HID driver is loaded
+- sends 14 inputs when pressed
+- Could be whitelisted, but has no serial number which makes it easily spoofable.
+  How can we allow such devices?
+- Idea: Allow not only one input per green phase but set a max of like 50?
+- Only strictly don't allow inputs during red phase, but enforce min one at green.
+- random duration of phases
+- interactive CAPTCHA
+- not only checking if something is sent -> but also that NOTHING is sent
+
+
+- usbfs driver is laoded, not NONE. What does it do? (Sometimes none, depends on PC)
+
+First of all the VM has to be prepared. As we are using Alpine, we have to make our scripts work!
+First execute these commands:
+sudo apt install guestfs-tools (on host)
+
+echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
+apk update
+apk add python3 eudev py3-evdev py3-udev
+
+virt-customize -a images/alpine-base.qcow2 \
+--run-command 'mkdir -p /opt/scanner/badusb' \
+--upload components/guest/usbesafed-vm/src/orchestrator.py:/opt/scanner/orchestrator.py \
+--upload components/guest/usbesafed-vm/src/badusb/bad_usb_check.py:/opt/scanner/badusb/bad_usb_check.py \
+--upload components/guest/usbesafed-vm/src/host_communication.py:/opt/scanner/host_communication.py
+
+Theoretische gefahr: Angreifer baut badusb stick mit einem knopf und user denkt dass er ihn drücken muss.
+But there is no 100% protection against bad usb and this scenario is very unlikely to happen. We can show a hint in the
+status window:
+
+- Usb flash drives do not require keyboard capabilities
+- If you are sure that your device should not able to send button press signals to the PC, do not proceed and do not use
+  the device!
+
+virt-customize -a images/alpine-base.qcow2 \
+--upload components/guest/usbesafed-vm/src/usbesafed-vm.sh:/usr/local/bin/usbesafed-vm.sh \
+--run-command "chmod +x /usr/local/bin/usbesafed-vm.sh" \
+--run-command "apk add python3 eudev py3-evdev py3-udev" \
+--run-command "mkdir -p /opt/scanner/badusb" \
+--upload components/guest/usbesafed-vm/src/orchestrator.py:/opt/scanner/orchestrator.py \
+--upload components/guest/usbesafed-vm/src/badusb/bad_usb_check.py:/opt/scanner/badusb/bad_usb_check.py \
+--upload components/guest/usbesafed-vm/src/host_communication.py:/opt/scanner/host_communication.py \
+--upload components/guest/usbesafed-vm/src/orchestrator-vm:/etc/init.d/orchestrator-vm \
+--upload components/guest/scanner/scanner.py:/opt/scanner/scanner.py \
+--chmod 0755:/etc/init.d/orchestrator-vm \
+--chmod 0755:/opt/scanner/orchestrator.py \
+--run-command 'rc-update add udev sysinit' \
+--run-command 'rc-update add udev-trigger sysinit' \
+--run-command 'rc-update add orchestrator-vm default'
+
+virt-customize -a images/alpine-base.qcow2 \
+--upload components/guest/usbesafed-vm/src/orchestrator.py:/opt/scanner/orchestrator.py
+
+
 
 

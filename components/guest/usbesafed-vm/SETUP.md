@@ -2,7 +2,8 @@
 
 This document describes **how to deploy and enable the USBeSafe VM daemon** inside the Alpine-based guest VM.
 
-It intentionally focuses on **commands and steps**, **not on code**, so it can be used as an installation / handover document.
+It intentionally focuses on **commands and steps**, **not on code**, so it can be used as an installation / handover
+document.
 
 ---
 
@@ -24,9 +25,40 @@ Inside the VM, the following must already exist:
 - Alpine Linux with OpenRC
 - BusyBox core utilities (`sh`, `df`, `cp`, `awk`)
 - A virtio-serial device exposed by QEMU:
-  - `/dev/virtio-ports/com.securepass.comm`
+    - `/dev/virtio-ports/com.securepass.comm`
 - A scanner implementation already present:
-  - e.g. `scanner.py` (exact logic irrelevant here)
+    - e.g. `scanner.py` (exact logic irrelevant here)
+
+---
+
+## Load guest files to vm
+
+```shell
+virt-customize -a images/alpine-base.qcow2 \
+    --upload components/guest/usbesafed-vm/src/usbesafed-vm.sh:/usr/local/bin/usbesafed-vm.sh \
+    --upload components/guest/usbesafed-vm/src/usbesafed-vm:/etc/init.d/usbesafed-vm \
+    --upload components/guest/init-script/install.sh:/usr/local/sbin/securepass-init.sh \
+    --chmod 0755:/usr/local/bin/usbesafed-vm.sh \
+    --chmod 0755:/etc/init.d/usbesafed-vm \
+    --chmod 0755:/usr/local/sbin/securepass-init.sh \
+    --run-command 'rc-update add usbesafed-vm default' \
+    --run-command "apk add python3 eudev py3-evdev py3-udev" \
+    --run-command "mkdir -p /opt/scanner/badusb" \
+    --upload components/guest/usbesafed-vm/src/orchestrator.py:/opt/scanner/orchestrator.py \
+    --upload components/guest/usbesafed-vm/src/badusb/bad_usb_check.py:/opt/scanner/badusb/bad_usb_check.py \
+    --upload components/guest/usbesafed-vm/src/host_communication.py:/opt/scanner/host_communication.py \
+    --upload components/guest/usbesafed-vm/src/orchestrator-vm:/etc/init.d/orchestrator-vm \
+    --upload components/guest/scanner/scanner.py:/opt/scanner/scanner.py \
+    --chmod 0755:/etc/init.d/orchestrator-vm \
+    --chmod 0755:/opt/scanner/orchestrator.py \
+    --run-command 'rc-update add udev sysinit' \
+    --run-command 'rc-update add udev-trigger sysinit' \
+    --run-command 'rc-update add orchestrator-vm default'
+```
+
+Execute `/usr/local/sbin/securepass-init.sh` manually
+via [edit_base_image.py](../../host/usbesafed/src/edit_base_image.py)!!!
+Internet connection is needed.
 
 ---
 
@@ -98,16 +130,16 @@ Once running, the daemon behaves as follows:
 2. Automatically runs the **scanner** on the USB contents.
 
 3. If the scan fails:
-   - sends `fail` via virtio
-   - performs no further actions
+    - sends `fail` via virtio
+    - performs no further actions
 
 4. If the scan succeeds:
-   - calculates the **used size of the USB**
-   - rounds the value **up to full GiB**
-   - sends:
-     - `size_gb:<N>`
-     - `ok`
-     over the virtio channel
+    - calculates the **used size of the USB**
+    - rounds the value **up to full GiB**
+    - sends:
+        - `size_gb:<N>`
+        - `ok`
+          over the virtio channel
 
    *(Purpose: the host uses this information to create a correctly sized virtual USB stick.)*
 
@@ -133,43 +165,43 @@ To verify that VM → Host communication works:
 - The entry `com.securepass.comm` **must exist** and point to a `vport*` device.
 
 - When the daemon runs and events occur, the host should receive:
-  - `fail`
-  - or `size_gb:N`
-  - followed by `ok`
-  - followed by `copy_done`
+    - `fail`
+    - or `size_gb:N`
+    - followed by `ok`
+    - followed by `copy_done`
 
 ---
 
 ## Notes & Design Guarantees
 
 - The VM daemon:
-  - does **not** manage VM lifecycle
-  - does **not** attach USB devices
-  - does **not** delete overlays
-  - does **not** shut down the VM
+    - does **not** manage VM lifecycle
+    - does **not** attach USB devices
+    - does **not** delete overlays
+    - does **not** shut down the VM
 
 - The VM only **signals state**.
 - The host is the **single authority** for:
-  - QMP actions
-  - overlay cleanup
-  - user notifications
-  - VM shutdown
+    - QMP actions
+    - overlay cleanup
+    - user notifications
+    - VM shutdown
 
 ---
 
 ## Troubleshooting Checklist
 
 - Daemon not starting:
-  - check executable bits on both files
-  - verify OpenRC is running
+    - check executable bits on both files
+    - verify OpenRC is running
 
 - No virtio messages:
-  - confirm `/dev/virtio-ports/com.securepass.comm` exists
-  - verify QEMU was started with `virtio-serial` + `virtserialport`
+    - confirm `/dev/virtio-ports/com.securepass.comm` exists
+    - verify QEMU was started with `virtio-serial` + `virtserialport`
 
 - Copy never starts:
-  - ensure the virtual USB is actually mounted inside the VM
-  - mounting is outside the daemon’s responsibility
+    - ensure the virtual USB is actually mounted inside the VM
+    - mounting is outside the daemon’s responsibility
 
 ---
 
