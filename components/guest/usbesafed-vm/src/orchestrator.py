@@ -1,7 +1,4 @@
-from select import select
-
 import pyudev
-from evdev.ecodes import EV_KEY
 from pyudev import Device
 
 import host_communication
@@ -55,29 +52,22 @@ def main():
     for child in device_to_scan.children:
         device_drivers.add(child.driver)
 
-    bad_usb_result = None
-    is_usb_storage = False
-
     if "hid-generic" in device_drivers or "usbhid" in device_drivers:
         bad_usb_result = start_red_light_green_light(vid, pid)
         print(f"[INFO] BadUSB Check OK: ", bad_usb_result)
         if not bad_usb_result:
             send_to_host("fail,")
+            return
 
     # Execute malware scans
     if "usb-storage" in device_drivers:
-        is_usb_storage = True
         # TODO mount and scan
         print("TODO STORAGE")
+        return  # virtio handling for usb storage is usbesafed-vm.sh's responsibility
 
-    # if device is HID and not mass storage + bad usb checks successful
-    if not is_usb_storage and bad_usb_result:
-        host_communication.send_to_host("ok,False")
-        return
-
-    if is_usb_storage:
-        # todo write return value for shell script
-        print("TODO")
+    # if device is HID and not mass storage
+    host_communication.send_to_host("ok,False")
+    return
 
 
 if __name__ == "__main__":

@@ -1,5 +1,3 @@
-import os
-
 VIRTIO_PORT_PATH = "/dev/virtio-ports/com.securepass.comm"
 
 
