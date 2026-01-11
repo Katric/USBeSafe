@@ -382,12 +382,15 @@ status window:
   the device!
 
 virt-customize -a images/alpine-base.qcow2 \
+--upload components/guest/usbesafed-vm/src/usbesafed-vm.sh:/usr/local/bin/usbesafed-vm.sh \
+--run-command "chmod +x /usr/local/bin/usbesafed-vm.sh" \
 --run-command "apk add python3 eudev py3-evdev py3-udev" \
 --run-command "mkdir -p /opt/scanner/badusb" \
 --upload components/guest/usbesafed-vm/src/orchestrator.py:/opt/scanner/orchestrator.py \
 --upload components/guest/usbesafed-vm/src/badusb/bad_usb_check.py:/opt/scanner/badusb/bad_usb_check.py \
 --upload components/guest/usbesafed-vm/src/host_communication.py:/opt/scanner/host_communication.py \
 --upload components/guest/usbesafed-vm/src/orchestrator-vm:/etc/init.d/orchestrator-vm \
+--upload components/guest/scanner/scanner.py:/opt/scanner/scanner.py \
 --chmod 0755:/etc/init.d/orchestrator-vm \
 --chmod 0755:/opt/scanner/orchestrator.py \
 --run-command 'rc-update add udev sysinit' \
