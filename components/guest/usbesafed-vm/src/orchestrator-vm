@@ -1,0 +1,26 @@
+#!/sbin/openrc-run
+
+name="USB Scanner Orchestrator"
+description="Finds the USB device that has to be scanned and decides by driver what has to be done."
+
+directory="/opt/scanner"
+
+command="/usr/bin/python3"
+command_args="orchestrator.py"
+command_background=true
+
+pidfile="/run/orchestrator-vm.pid"
+
+output_log="/var/log/orchestrator.log"
+error_log="/var/log/orchestrator.err"
+
+depend() {
+    need localmount
+    after udev udev-trigger
+}
+
+start_pre() {
+    ebegin "Waiting for USB init..."
+    sleep 5
+    eend 0
+}
