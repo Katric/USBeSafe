@@ -3,7 +3,7 @@ import time
 from select import select
 
 import evdev
-from evdev import ecodes, InputDevice
+from evdev import InputDevice
 from evdev.ecodes import *
 
 import host_communication
@@ -44,7 +44,7 @@ def start_red_light_green_light(vid: str, pid: str) -> bool:
         duration = random.uniform(5.0, 10.0)
         if is_first_round:
             # extra time in first round so user can prepare
-            duration += 30
+            duration = 15
         print(f"[INFO] Green phase is {duration} seconds. One input has to be sent.")
 
         flush_input(devices)

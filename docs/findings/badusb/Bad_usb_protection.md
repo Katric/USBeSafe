@@ -373,6 +373,26 @@ virt-customize -a images/alpine-base.qcow2 \
 --upload components/guest/usbesafed-vm/src/badusb/bad_usb_check.py:/opt/scanner/badusb/bad_usb_check.py \
 --upload components/guest/usbesafed-vm/src/host_communication.py:/opt/scanner/host_communication.py
 
+Theoretische gefahr: Angreifer baut badusb stick mit einem knopf und user denkt dass er ihn drücken muss.
+But there is no 100% protection against bad usb and this scenario is very unlikely to happen. We can show a hint in the
+status window:
+
+- Usb flash drives do not require keyboard capabilities
+- If you are sure that your device should not able to send button press signals to the PC, do not proceed and do not use
+  the device!
+
+virt-customize -a images/alpine-base.qcow2 \
+--run-command "apk add python3 eudev py3-evdev py3-udev" \
+--run-command "mkdir -p /opt/scanner/badusb" \
+--upload components/guest/usbesafed-vm/src/orchestrator.py:/opt/scanner/orchestrator.py \
+--upload components/guest/usbesafed-vm/src/badusb/bad_usb_check.py:/opt/scanner/badusb/bad_usb_check.py \
+--upload components/guest/usbesafed-vm/src/host_communication.py:/opt/scanner/host_communication.py \
+--upload components/guest/usbesafed-vm/src/orchestrator-vm:/etc/init.d/orchestrator-vm \
+--chmod 0755:/etc/init.d/orchestrator-vm \
+--chmod 0755:/opt/scanner/orchestrator.py \
+--run-command 'rc-update add udev sysinit' \
+--run-command 'rc-update add udev-trigger sysinit' \
+--run-command 'rc-update add orchestrator-vm default'
 
 
 

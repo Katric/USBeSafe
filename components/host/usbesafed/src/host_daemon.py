@@ -12,7 +12,7 @@ from pyudev import Monitor, Context
 
 import popup
 from vusb import VirtualUSBStick
-from popup import show_delete_vusb_popup, StatusWindow
+from popup import show_delete_vusb_popup, StatusWindow, BadUsbCheckWindow
 import manage_usb_ids
 import check_and_load_bad_usb_config
 
@@ -30,6 +30,10 @@ QMP_SOCKET = "/tmp/securepass_qmp.sock"
 VIRTIO_SOCKET = "/tmp/securepass_virtio.sock"
 
 VUSB_IMMAGE = Path("/tmp/vusb.img")  # temporary vUSB image location
+
+# bad usb check virtio messages
+BAD_USB_CHECK_GREEN = "BAD_USB_CHECK_GREEN"
+BAD_USB_CHECK_RED = "BAD_USB_CHECK_RED"
 
 
 # ============================================================
@@ -322,6 +326,34 @@ def cleanup_overlay():
 
 
 # ============================================================
+#                       BAD USB CHECK
+# ============================================================
+def bad_usb_check(first_message: str, vm) -> str:
+    window = BadUsbCheckWindow()
+    window.start()
+
+    try:
+        message = first_message
+        while True:
+            # Wenn wir keine Nachricht haben, warten wir auf die nächste
+            if message is None:
+                # wait_for_virtio blockiert, bis was kommt
+                message = wait_for_virtio(vm).strip()
+
+            # Prüfen, ob es ein Status-Update ist
+            if message in [BAD_USB_CHECK_GREEN, BAD_USB_CHECK_RED]:
+                window.next()
+                message = None  # Wichtig: Auf None setzen, damit wir im nächsten Loop neu lesen
+            else:
+                # Es ist keine Farbe, also ist es das Endergebnis (oder Fehler)
+                return message
+
+    finally:
+        # WICHTIG: Das Fenster wird geschlossen, egal ob return oder Crash
+        window.close()
+
+
+# ============================================================
 #                    EXISTING USB LISTENER
 # ============================================================
 
@@ -553,9 +585,11 @@ def run_prod_scan(vid, pid, status_window, usb_device, device_hash: str):
         create_overlay()
         vm = start_vm(vid, pid)
 
-        # ---------------- FIRST MESSAGE (OK or FAIL) ----------------
-        # will be in format "ok,True", "ok,False", "fail,"
-        result, is_mass_storage = wait_for_virtio(vm).strip().split(',')
+        message = wait_for_virtio(vm).strip()
+        if message.startswith("BAD_USB_CHECK"):
+            message = bad_usb_check(message, vm)
+
+        result, is_mass_storage = message.split(',')
 
     except Exception as e:
         print(f"[ERROR] Exception during VM creation {e}")
