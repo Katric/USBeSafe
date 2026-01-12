@@ -53,6 +53,8 @@ def show_delete_vusb_popup(mount_path):
                 "--title=USBeSafe - USB Device Scanned",
                 "--text=" + message,
                 "--width=400",
+                "--center",
+                "--on-top",
                 "--button=Delete vUSB Image:0",
             ],
             capture_output=True
@@ -107,6 +109,8 @@ def show_scan_popup(device_info):
                 "--title=USBeSafe - USB Device Detected",
                 "--text=" + message,
                 "--width=550",
+                "--center",
+                "--on-top",
                 "--button=Scan Device:0",
                 "--button=Don't Scan:1",
                 "--timeout=" + str(POPUP_TIMEOUT),
@@ -183,6 +187,7 @@ class StatusWindow:
                     "--text=Initializing scan...",
                     "--width=500",
                     "--height=150",
+                    "--center",
                     "--no-buttons",
                     "--pulsate",
                     "--auto-close"
