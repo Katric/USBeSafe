@@ -534,7 +534,7 @@ def handle_add_usb():
         else:
             print("[Warning] Device is NOT present on the whitelist and needs to be scanned.")
 
-            if not popup.show_whitelist_popup(device_info):
+            if not popup.show_scan_popup(device_info):
                 print("🚫 Scan cancelled by user")
                 continue
 

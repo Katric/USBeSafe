@@ -398,7 +398,7 @@ def handle_add_usb(is_bad_usb_protection_active: bool):
                 print("[Warning] Device is NOT present on the whitelist and needs to be scanned.")
                 # If 'scan'         ->  pass PCI Controller to VM
                 # Else 'don't scan' ->  reject USB device and let it stay unauthorized
-                if not popup.show_whitelist_popup(device_info):
+                if not popup.show_scan_popup(device_info):
                     print("🚫 Scan cancelled by user")
                     continue
                 else:
