@@ -300,10 +300,14 @@ while :; do
   # 5) Copy data
   # ----------------------------------------------------------
   if copy_real_to_vusb; then
+    sync
+    for _ in 1 2 3 4 5; do
+      umount "$VUSB_MOUNT" 2>/dev/null && break
+      sleep 0.2
+    done
+    sync
     send_virtio "copy_done"
   else
-    # Copy failing is important to see on the host.
-    # We still log here; you can later decide if you want an explicit protocol message.
     log "ERROR: Copy failed. (Host-side reaction TBD)"
   fi
 
