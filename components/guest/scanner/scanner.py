@@ -1,8 +1,25 @@
+#!/usr/bin/env python3
 import subprocess
 import logging
 import sys
 import os
 
+# ---------------- CONFIG ----------------
+LOG_FILE = "/var/log/clamav-wrapper.log"
+FRESHCLAM_CONFIG = "/etc/clamav/freshclam.conf"
+
+# ---------------- LOGGING (must be set up BEFORE logger is used) ----------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler(sys.stdout),
+    ],
+)
+logger = logging.getLogger("clamav-wrapper")
+
+# ---------------- ARGUMENT CHECKS ----------------
 if len(sys.argv) != 2:
     logger.error("Usage: %s <scan_directory>", sys.argv[0])
     sys.exit(2)
@@ -12,21 +29,6 @@ SCAN_DIR = sys.argv[1]
 if not os.path.isdir(SCAN_DIR):
     logger.error("Scan directory does not exist or is not a directory: %s", SCAN_DIR)
     sys.exit(2)
-
-
-LOG_FILE = "/var/log/clamav-wrapper.log"
-FRESHCLAM_CONFIG = "/etc/clamav/freshclam.conf"
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler(LOG_FILE),
-        logging.StreamHandler(sys.stdout),
-    ],
-)
-
-logger = logging.getLogger("clamav-wrapper")
 
 
 def run_freshclam():

@@ -655,6 +655,7 @@ def run_prod_scan(vid, pid, status_window, usb_device, device_hash: str):
             # ---------------- WAIT FOR "copy_done" ----------------
             msg = wait_for_virtio(vm)
             if msg == "copy_done":
+                #time.sleep(100000) #debug sleep
                 status_window.update("Copy completed.")
                 time.sleep(2)
                 v_usb.detach_from_vm()

@@ -42,7 +42,6 @@ virt-customize -a images/alpine-base.qcow2 \
     --chmod 0755:/etc/init.d/usbesafed-vm \
     --chmod 0755:/usr/local/sbin/securepass-init.sh \
     --run-command 'rc-update add usbesafed-vm default' \
-    --run-command "apk add python3 eudev py3-evdev py3-udev" \
     --run-command "mkdir -p /opt/scanner/badusb" \
     --upload components/guest/usbesafed-vm/src/orchestrator.py:/opt/scanner/orchestrator.py \
     --upload components/guest/usbesafed-vm/src/badusb/bad_usb_check.py:/opt/scanner/badusb/bad_usb_check.py \
