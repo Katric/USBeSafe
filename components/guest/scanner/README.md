@@ -1,4 +1,4 @@
-* Most of this README was automatically generated using Google Gemini Pro 3 and was manually reviewed for correctness by Constantin Schreyer *
+*Most of this README was automatically generated using Google Gemini Pro 3 and was manually reviewed for correctness by Constantin Schreyer*
 
 # Malware Scanner
 
@@ -24,12 +24,16 @@ While ClamAV offers a multi-threaded daemon (`clamd`), this project utilizes a d
 This component uses specific exit codes to communicate with the VM daemon or calling process:
 
 `0` → **Clean**: No malware found.
+
 `1` → **Infected**: Malware was detected in the target directory.
+
 `2` → **Error**: Invalid arguments, missing directory, or scanner failure.
 
 # Logging
 Logs are written to `stdout` and the `LOG_FILE` simultaneously with timestamps.
 
 **Info**: Start/stop events, scan progress, clean results.
+
 **Warning**: Malware detection, freshclam failures.
+
 **Error**: Critical failures (missing directories, argument errors).
