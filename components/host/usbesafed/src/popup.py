@@ -184,7 +184,6 @@ class StatusWindow:
                     "yad",
                     "--progress",
                     "--title=USBeSafe - Scanning USB Device",
-                    "--text=Initializing scan...",
                     "--width=500",
                     "--height=150",
                     "--center",

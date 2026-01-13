@@ -582,12 +582,18 @@ def run_prod_scan(vid, pid, status_window, usb_device, device_hash: str):
     vm = None
 
     try:
+        status_window.update("Creating VM overlay...")
         create_overlay()
+        status_window.update("Starting VM...")
         vm = start_vm(vid, pid)
 
+        status_window.update("Waiting for VM response...")
         message = wait_for_virtio(vm).strip()
         if message.startswith("BAD_USB_CHECK"):
+            status_window.update("Performing Bad USB checks...")
             message = bad_usb_check(message, vm)
+
+        status_window.update("Processing scan results...")
 
         result, is_mass_storage = message.split(',')
 
@@ -608,6 +614,7 @@ def run_prod_scan(vid, pid, status_window, usb_device, device_hash: str):
         status_window.update("Scan FAILED, malware detected! Ejecting usb device...")
         kill_vm_and_cleanup_overlay(vm, usb_device)
         eject_usb_device(usb_device.sys_path)
+        time.sleep(3)
         status_window.close()
         return
 
@@ -616,8 +623,11 @@ def run_prod_scan(vid, pid, status_window, usb_device, device_hash: str):
         # usb device is safe. Register it on the whitelist if it is NOT a mass storage device
         if is_mass_storage == "False":
             print("[Info] Device will be added to whitelist...")
+            status_window.update("Device is safe! Shutting down VM...")
             kill_vm_and_cleanup_overlay(vm, usb_device)
+            status_window.update("Adding device to whitelist...")
             manage_usb_ids.add_to_whitelist_file(device_hash)
+            status_window.update("Authorizing device on host...")
             authorize_and_trigger_usb_probe(usb_device)
             status_window.update("Device was successfully authorized and added to the whitelist!")
             time.sleep(3)
@@ -627,8 +637,9 @@ def run_prod_scan(vid, pid, status_window, usb_device, device_hash: str):
         elif is_mass_storage == "True":
             print("[Info] Device was marked as a mass storage device and will not be added to the whitelist")
 
-            status_window.update("Scan clean, waiting for copy…")
+            status_window.update("Device is safe! Preparing for file copy...")
             # ---------------- SECOND MESSAGE (USB SIZE) ----------------
+            status_window.update("Waiting for USB size information...")
             real_usb_size_gb = wait_for_virtio(vm)
             if not real_usb_size_gb.isdigit():
                 status_window.update("Error: Invalid USB size received from VM.")
@@ -653,18 +664,22 @@ def run_prod_scan(vid, pid, status_window, usb_device, device_hash: str):
                 return
 
             # ---------------- WAIT FOR "copy_done" ----------------
+            status_window.update("Copying files to vUSB...")
             msg = wait_for_virtio(vm)
             if msg == "copy_done":
                 #time.sleep(100000) #debug sleep
                 status_window.update("Copy completed.")
                 time.sleep(2)
+                status_window.update("Detaching vUSB from VM...")
                 v_usb.detach_from_vm()
                 status_window.update("Shutting down VM…")
                 kill_vm_and_cleanup_overlay(vm, usb_device)
+                status_window.update("Mounting vUSB on host...")
                 v_usb.mount_on_host()
                 status_window.update(f"vUSB mounted on host at {v_usb.host_mount}")
 
                 if show_delete_vusb_popup(v_usb.host_mount):
+                    status_window.update("Cleaning up vUSB...")
                     v_usb.unmount_from_host()
                     os.remove(v_usb.image_path)
                     status_window.update("Temporary vUSB image deleted.")
@@ -675,6 +690,7 @@ def run_prod_scan(vid, pid, status_window, usb_device, device_hash: str):
                 status_window.close()
                 return
             else:
+                status_window.update("Error: Unexpected message from VM.")
                 print("[ERROR] Unknown message while trying to wait for 'copy_done'")
                 time.sleep(3)
                 status_window.close()
@@ -684,12 +700,13 @@ def run_prod_scan(vid, pid, status_window, usb_device, device_hash: str):
 
         else:
             print("[ERROR] Variable is_mass_storage is unknown")
-            status_window.update("Unknown VM message.")
-            time.sleep(3)
+            status_window.update("Error: Invalid device type response from VM.")
+            time.sleep(2)
             status_window.update("Shutting down VM...")
             kill_vm_and_cleanup_overlay(vm, usb_device)
+            status_window.update("Ejecting USB device...")
             eject_usb_device(usb_device.sys_path)
-            time.sleep(3)
+            time.sleep(2)
             status_window.close()
             return
 
