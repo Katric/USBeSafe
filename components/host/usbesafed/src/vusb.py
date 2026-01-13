@@ -125,36 +125,87 @@ class VirtualUSBStick:
     def unmount_from_host(self):
         """
         Unmount the virtual USB stick from the host
-        
+
         Args:
             mount_point: Directory where it's mounted
         """
         mount_point = Path(self.host_mount)
         print(f"[+] Unmounting {mount_point}")
-        
+
         try:
-            # Unmount
-            subprocess.run([
-                'umount',
-                str(mount_point)
-            ], check=True, capture_output=True)
-            print(f"[+] Unmounted from {mount_point}")
-            
-            # Detach loop device
+            # Flush pending writes
+            subprocess.run(["sync"], check=False)
+
+            # Unmount (retry a bit if busy)
+            last_err = ""
+            for _ in range(5):
+                p = subprocess.run(
+                    ["umount", str(mount_point)],
+                    capture_output=True,
+                    text=True
+                )
+                if p.returncode == 0:
+                    print(f"[+] Unmounted from {mount_point}")
+                    break
+
+                last_err = (p.stderr or "").strip()
+
+                # Already unmounted -> treat as success
+                if "not mounted" in last_err.lower():
+                    break
+
+                # Busy -> wait and retry
+                if "busy" in last_err.lower():
+                    time.sleep(0.5)
+                    continue
+
+                # Other error -> stop immediately
+                raise Exception(f"Failed to unmount: {last_err}")
+            else:
+                # Still busy after retries -> lazy unmount
+                subprocess.run(
+                    ["umount", "-l", str(mount_point)],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                print(f"[+] Lazy-unmounted {mount_point}")
+
+            # Detach loop device (use stored loop device if known)
             if self.loop_device:
-                subprocess.run([
-                    'losetup',
-                    '-d',
-                    self.loop_device
-                ], check=True, capture_output=True)
+                subprocess.run(
+                    ["losetup", "-d", self.loop_device],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
                 print(f"[+] Loop device {self.loop_device} detached")
                 self.loop_device = None
-            
+            else:
+                # Fallback: detach any loop device currently backed by this image
+                p = subprocess.run(
+                    ["losetup", "-j", str(self.image_path)],
+                    capture_output=True,
+                    text=True
+                )
+                if p.returncode == 0 and p.stdout.strip():
+                    # Example line: /dev/loop7: [xxxx]: (/tmp/vusb.img)
+                    loopdev = p.stdout.split(":", 1)[0].strip()
+                    subprocess.run(
+                        ["losetup", "-d", loopdev],
+                        check=True,
+                        capture_output=True,
+                        text=True
+                    )
+                    print(f"[+] Loop device {loopdev} detached (fallback)")
+
             return True
-            
+
         except subprocess.CalledProcessError as e:
-            raise Exception(f"Failed to unmount: {e.stderr.decode()}")
-    
+            # text=False here, so stderr is bytes -> decode safely
+            stderr = e.stderr.decode(errors="replace") if e.stderr else str(e)
+            raise Exception(f"Failed to unmount: {stderr}")
+        
     def attach_to_vm(self):
         """
         Attach the virtual USB stick to a QEMU VM via QMP
