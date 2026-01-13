@@ -180,7 +180,7 @@ def create_overlay():
 #                     QEMU START
 # ============================================================
 
-def start_vm(vid, pid):
+def start_vm(vid, pid, kvm_available=True):
     """
     PRODUCTION VM:
     - headless
@@ -191,8 +191,6 @@ def start_vm(vid, pid):
     """
 
     print("[INFO] Starting scanning VM")
-    # Check if KVM is available
-    kvm_available = os.path.exists("/dev/kvm")
 
     # Remove old sockets
     for s in (QMP_SOCKET, VIRTIO_SOCKET):
@@ -328,7 +326,7 @@ def cleanup_overlay():
 # ============================================================
 #                       BAD USB CHECK
 # ============================================================
-def bad_usb_check(first_message: str, vm) -> str:
+def bad_usb_check(first_message: str, vm, timeout) -> str:
     window = BadUsbCheckWindow()
     window.start()
 
@@ -338,7 +336,7 @@ def bad_usb_check(first_message: str, vm) -> str:
             # Wenn wir keine Nachricht haben, warten wir auf die nächste
             if message is None:
                 # wait_for_virtio blockiert, bis was kommt
-                message = wait_for_virtio(vm).strip()
+                message = wait_for_virtio(vm, timeout).strip()
 
             # Prüfen, ob es ein Status-Update ist
             if message in [BAD_USB_CHECK_GREEN, BAD_USB_CHECK_RED]:
@@ -581,17 +579,21 @@ def run_prod_scan(vid, pid, status_window, usb_device, device_hash: str):
     is_mass_storage = None
     vm = None
 
+    # Check if KVM is available
+    kvm_available = os.path.exists("/dev/kvm")
+    timeout = 600 if kvm_available else 1200  # more time if no kvm
+
     try:
         status_window.update("Creating VM overlay...")
         create_overlay()
         status_window.update("Starting VM...")
-        vm = start_vm(vid, pid)
+        vm = start_vm(vid, pid, kvm_available)
 
         status_window.update("Waiting for VM response...")
-        message = wait_for_virtio(vm).strip()
+        message = wait_for_virtio(vm, timeout).strip()
         if message.startswith("BAD_USB_CHECK"):
             status_window.update("Performing Bad USB checks...")
-            message = bad_usb_check(message, vm)
+            message = bad_usb_check(message, vm, timeout)
 
         status_window.update("Processing scan results...")
 
@@ -640,7 +642,7 @@ def run_prod_scan(vid, pid, status_window, usb_device, device_hash: str):
             status_window.update("Device is safe! Preparing for file copy...")
             # ---------------- SECOND MESSAGE (USB SIZE) ----------------
             status_window.update("Waiting for USB size information...")
-            real_usb_size_gb = wait_for_virtio(vm)
+            real_usb_size_gb = wait_for_virtio(vm, timeout)
             if not real_usb_size_gb.isdigit():
                 status_window.update("Error: Invalid USB size received from VM.")
                 kill_vm_and_cleanup_overlay(vm, usb_device)
@@ -665,7 +667,7 @@ def run_prod_scan(vid, pid, status_window, usb_device, device_hash: str):
 
             # ---------------- WAIT FOR "copy_done" ----------------
             status_window.update("Copying files to vUSB...")
-            msg = wait_for_virtio(vm)
+            msg = wait_for_virtio(vm, timeout)
             if msg == "copy_done":
                 #time.sleep(100000) #debug sleep
                 status_window.update("Copy completed.")
