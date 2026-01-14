@@ -6,7 +6,7 @@ This component is a custom Python wrapper for **ClamAV**. It provides a streamli
 
 
 ## Setup
-Copy the scanner.py file into the VM (opt/scanner/scanner.py)
+Copy the scanner.py file into the VM (opt/scanner/scanner.py).
 
 
 ## Design Rationale
