@@ -41,10 +41,11 @@ def start_red_light_green_light(vid: str, pid: str) -> bool:
         print(f"[INFO] Starting round {i}/3...")
 
         # GREEN PHASE
-        duration = random.uniform(5.0, 10.0)
+        duration = random.uniform(2.0, 3.0)
         if is_first_round:
             # extra time in first round so user can prepare
             duration = 15
+            is_first_round = False
         print(f"[INFO] Green phase is {duration} seconds. One input has to be sent.")
 
         flush_input(devices)
@@ -58,7 +59,7 @@ def start_red_light_green_light(vid: str, pid: str) -> bool:
             print("[INFO] Received input during green phase.")
 
         # RED PHASE
-        duration = random.uniform(3.0, 10.0)
+        duration = random.uniform(3.0, 20.0)
         print(f"[INFO] Red phase is {duration} seconds. No input must be sent.")
 
         time.sleep(0.5)
